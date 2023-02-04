@@ -16,6 +16,13 @@ $Console:Only
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
+' CONSTANTS
+'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+Const BASE64_CHARACTERS_PER_LINE = 20 * 4
+'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+'---------------------------------------------------------------------------------------------------------------------------------------------------------------
 ' PROGRAM ENTRY POINT
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
 ' Change to the directory specified by the environment
@@ -54,7 +61,7 @@ End If
 Print
 
 ' Convert all files requested
-Dim As Long i
+Dim As Unsigned Long i
 For i = 1 To CommandCount
     MakeResource Command$(i)
 Next
@@ -71,7 +78,7 @@ Function GetFileNameFromPath$ (pathName As String)
 
     ' Retrieve the position of the first / or \ in the parameter from the
     For i = Len(pathName) To 1 Step -1
-        If Asc(pathName, i) = 47 Or Asc(pathName, i) = 92 Then Exit For
+        If Asc(pathName, i) = KEY_SLASH Or Asc(pathName, i) = KEY_BACKSLASH Then Exit For
     Next
 
     ' Return the full string if pathsep was not found
@@ -90,10 +97,10 @@ Function MakeLegalLabel$ (fileName As String, fileSize As Unsigned Long)
 
     For i = 1 To Len(label)
         Select Case Asc(label, i)
-            Case 48 To 57, 65 To 90, 97 To 122, 95 ' legal characters
+            Case KEY_0 To KEY_9, KEY_UPPER_A To KEY_UPPER_Z, KEY_LOWER_A To KEY_LOWER_Z, KEY_UNDERSCORE ' legal characters
                 ' NOP
             Case Else
-                Asc(label, i) = 95 ' replace with underscore
+                Asc(label, i) = KEY_UNDERSCORE ' replace with underscore
         End Select
     Next
 
@@ -147,7 +154,7 @@ Sub MakeResource (fileName As String)
 
             Dim As Unsigned Long i
             For i = 1 To Len(buffer)
-                If (i - 1) Mod 80 = 0 Then
+                If (i - 1) Mod BASE64_CHARACTERS_PER_LINE = 0 Then
                     If i > 1 Then Print #fh, NULLSTRING
                     Print #fh, "Data ";
                 End If

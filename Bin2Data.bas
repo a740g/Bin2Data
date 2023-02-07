@@ -33,8 +33,7 @@ If CommandCount < 1 Then
     Print
     Print "Bin2Data: Converts binary files to QB64 Data"
     Print
-    Print "Copyright (c) Samuel Gomes, 2023."
-    Print "All rights reserved."
+    Print "Copyright (c) 2023 Samuel Gomes"
     Print
     Print "https://github.com/a740g"
     Print
@@ -108,65 +107,78 @@ Function MakeLegalLabel$ (fileName As String, fileSize As Unsigned Long)
 End Function
 
 
+' This reads in fileNames and converts it to Base64 after compressing it (if needed)
+' The file is then written as a QB64 include file
 Sub MakeResource (fileName As String)
     If Not FileExists(fileName) Then
         Print fileName; " does not exist!"
-    Else
-        Dim As String biFileName: biFileName = fileName + ".bi"
-
-        If FileExists(biFileName) Then
-            Print biFileName; " already exists!"
-        Else
-            Print "Processing "; fileName
-
-            ' Read in the whole file
-            Dim As Long fh: fh = FreeFile
-            Open fileName For Binary Access Read As fh
-            Dim As Unsigned Long ogSize: ogSize = LOF(fh)
-            Dim As String buffer: buffer = Input$(ogSize, fh)
-            Close fh
-
-            Print "File size is"; ogSize; "bytes"
-
-            Print "Writing to "; biFileName
-
-            ' Open the output file and write the label
-            Open biFileName For Output As fh
-            Print #fh, MakeLegalLabel(GetFileNameFromPath$(fileName), ogSize) ' write the label
-
-            ' Attempt to compress and see if we get any goodness
-            Dim As String compBuf: compBuf = Deflate$(buffer)
-
-            If Len(compBuf) < ogSize Then ' we got goodness
-                buffer = EncodeBase64(compBuf) ' we do not need the original buffer contents
-                Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(TRUE))
-
-                Print Using "Compressed###.##%"; 100 - 100! * Len(compBuf) / ogSize
-
-                compBuf = NULLSTRING
-            Else ' no goodness
-                buffer = EncodeBase64(buffer) ' we do not need the original buffer contents
-                Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(FALSE))
-                compBuf = NULLSTRING
-
-                Print "Stored"
-            End If
-
-            Dim As Unsigned Long i
-            For i = 1 To Len(buffer)
-                If (i - 1) Mod BASE64_CHARACTERS_PER_LINE = 0 Then
-                    If i > 1 Then Print #fh, NULLSTRING
-                    Print #fh, "Data ";
-                End If
-
-                Print #fh, Chr$(Asc(buffer, i));
-            Next
-
-            Close fh
-
-            Print "Done"
-        End If
+        Exit Sub
     End If
+
+    Dim As String biFileName: biFileName = fileName + ".bi"
+
+    If FileExists(biFileName) Then
+        Print biFileName; " already exists!"
+        Exit Sub
+    End If
+
+    Print "Processing "; fileName
+
+    Dim As Long fh: fh = FreeFile
+    Open fileName For Binary Access Read As fh
+
+    Dim As Unsigned Long ogSize: ogSize = LOF(fh)
+
+    If ogSize < 1 Then
+        Print fileName; " is empty!"
+        Close fh
+        Exit Sub
+    End If
+
+    ' Read in the whole file
+    Dim As String buffer: buffer = Input$(ogSize, fh)
+    Close fh
+
+
+    Print "File size is"; ogSize; "bytes"
+
+    Print "Writing to "; biFileName
+
+    ' Open the output file and write the label
+    Open biFileName For Output As fh
+    Print #fh, MakeLegalLabel(GetFileNameFromPath$(fileName), ogSize) ' write the label
+
+    ' Attempt to compress and see if we get any goodness
+    Dim As String compBuf: compBuf = Deflate$(buffer)
+
+    If Len(compBuf) < ogSize Then ' we got goodness
+        buffer = EncodeBase64(compBuf) ' we do not need the original buffer contents
+        Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(TRUE))
+
+        Print Using "Compressed###.##%"; 100 - 100! * Len(compBuf) / ogSize
+
+        compBuf = NULLSTRING
+    Else ' no goodness
+        buffer = EncodeBase64(buffer) ' we do not need the original buffer contents
+        Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(FALSE))
+        compBuf = NULLSTRING
+
+        Print "Stored"
+    End If
+
+    Dim As Unsigned Long i
+    For i = 1 To Len(buffer)
+        If (i - 1) Mod BASE64_CHARACTERS_PER_LINE = 0 Then
+            If i > 1 Then Print #fh, NULLSTRING
+            Print #fh, "Data ";
+        End If
+
+        Print #fh, Chr$(Asc(buffer, i));
+    Next
+
+    Close fh
+
+    Print "Done"
 End Sub
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
 

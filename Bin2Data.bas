@@ -13,6 +13,18 @@
 ' METACOMMANDS
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
 $Console:Only
+$ExeIcon:'./Bin2Data.ico'
+$VersionInfo:ProductName=Bin2Data
+$VersionInfo:CompanyName=Samuel Gomes
+$VersionInfo:LegalCopyright=Copyright (c) 2023 Samuel Gomes
+$VersionInfo:LegalTrademarks=All trademarks are property of their respective owners
+$VersionInfo:Web=https://github.com/a740g
+$VersionInfo:Comments=https://github.com/a740g
+$VersionInfo:InternalName=Bin2Data
+$VersionInfo:OriginalFilename=Bin2Data.exe
+$VersionInfo:FileDescription=Bin2Data executable
+$VersionInfo:FILEVERSION#=1,0,0,4
+$VersionInfo:PRODUCTVERSION#=1,0,0,0
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 '---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -30,6 +42,7 @@ ChDir StartDir$
 
 ' If there are no command line parameters just show some info and exit
 If CommandCount < 1 Then
+    Color 7
     Print
     Print "Bin2Data: Converts binary files to QB64 Data"
     Print
@@ -50,9 +63,11 @@ If CommandCount < 1 Then
     Print " 3. Include Base64.bi at the top of your source"
     Print " 4. Include Base64.bas at the bottom of your source"
     Print " 5. Load the file:"
+    Color 14
     Print "     Restore label_generated_by_bin2data"
     Print "     Dim buffer As String"
     Print "     buffer = LoadResource"
+    Color 7
     Print
     System
 End If

@@ -45,3 +45,7 @@ Function EncodeBase64$ (s As String)
 Function DecodeBase64$ (s As String)
 Function LoadResource$
 ```
+
+## Assets
+
+* [Icon](https://www.iconarchive.com/artist/umut-pulat.html) by [Umut Pulat](http://12m3.deviantart.com/)

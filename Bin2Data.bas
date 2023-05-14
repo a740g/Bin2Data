@@ -25,8 +25,8 @@ $VersionInfo:Comments=https://github.com/a740g
 $VersionInfo:InternalName=Bin2Data
 $VersionInfo:OriginalFilename=Bin2Data.exe
 $VersionInfo:FileDescription=Bin2Data executable
-$VersionInfo:FILEVERSION#=1,0,0,4
-$VersionInfo:PRODUCTVERSION#=1,0,0,0
+$VersionInfo:FILEVERSION#=1,1,0,0
+$VersionInfo:PRODUCTVERSION#=1,1,0,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------

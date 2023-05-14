@@ -1,17 +1,19 @@
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' Binary to Data converter using Base64 library
 ' Copyright (c) 2023 Samuel Gomes
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' HEADER FILES
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
-'$Include:'./include/Base64.bi'
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
+'$Include:'include/CRTLib.bi'
+'$Include:'include/FileOps.bi'
+'$Include:'include/Base64.bi'
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' METACOMMANDS
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 $Console:Only
 $ExeIcon:'./Bin2Data.ico'
 $VersionInfo:ProductName=Bin2Data
@@ -25,23 +27,30 @@ $VersionInfo:OriginalFilename=Bin2Data.exe
 $VersionInfo:FileDescription=Bin2Data executable
 $VersionInfo:FILEVERSION#=1,0,0,4
 $VersionInfo:PRODUCTVERSION#=1,0,0,0
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' CONSTANTS
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
-Const BASE64_CHARACTERS_PER_LINE = 20 * 4
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
+Const BASE64_CHARACTERS_PER_LINE_MIN = 1
+Const BASE64_CHARACTERS_PER_LINE_DEFAULT = 20 * 4
+Const BASE64_CHARACTERS_PER_LINE_MAX = 4096
+'-----------------------------------------------------------------------------------------------------------------------
 
+'-----------------------------------------------------------------------------------------------------------------------
+' GLOBAL VARIABLES
+'-----------------------------------------------------------------------------------------------------------------------
+Dim Shared dataCPL As Long: dataCPL = BASE64_CHARACTERS_PER_LINE_DEFAULT ' characters per data line
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' PROGRAM ENTRY POINT
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' Change to the directory specified by the environment
 ChDir StartDir$
 
 ' If there are no command line parameters just show some info and exit
-If CommandCount < 1 Then
+If CommandCount < 1 Or GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 Then
     Color 7
     Print
     Print "Bin2Data: Converts binary files to QB64 Data"
@@ -50,7 +59,8 @@ If CommandCount < 1 Then
     Print
     Print "https://github.com/a740g"
     Print
-    Print "Usage: bin2data [filespec]"
+    Print "Usage: Bin2Data [-w characters_per_data_line] [filespec]"
+    Print "   -w: A number specifying the number of characters per line. Default"; dataCPL
     Print
     Print "Note:"
     Print " * This will create filespec.bi"
@@ -75,35 +85,34 @@ End If
 Print
 
 ' Convert all files requested
-Dim As Unsigned Long i
-For i = 1 To CommandCount
-    MakeResource Command$(i)
-Next
+Dim argName As Integer
+Dim argIndex As Long: argIndex = 1 ' start with the first argument
+
+Do
+    argName = ToLower(GetProgramArgument("w", argIndex))
+
+    Select Case argName
+        Case -1 ' ' no more arguments
+            Exit Do
+
+        Case KEY_LOWER_W ' w
+            argIndex = argIndex + 1 ' value at next index
+            dataCPL = ClampLong(Val(Command$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
+            Print "Characters per data line set to"; dataCPL
+
+        Case Else ' probably a file name
+            MakeResource Command$(argIndex)
+    End Select
+
+    argIndex = argIndex + 1 ' move to the next index
+Loop Until argName = -1
 
 System
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' FUNCTIONS & SUBROUTINES
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
-' Gets the filename portion from a file path
-Function GetFileNameFromPath$ (pathName As String)
-    Dim i As Unsigned Long
-
-    ' Retrieve the position of the first / or \ in the parameter from the
-    For i = Len(pathName) To 1 Step -1
-        If Asc(pathName, i) = KEY_SLASH Or Asc(pathName, i) = KEY_BACKSLASH Then Exit For
-    Next
-
-    ' Return the full string if pathsep was not found
-    If i = 0 Then
-        GetFileNameFromPath = pathName
-    Else
-        GetFileNameFromPath = Right$(pathName, Len(pathName) - i)
-    End If
-End Function
-
-
+'-----------------------------------------------------------------------------------------------------------------------
 ' Removes invalid characters from filenames and makes a valid QB64 line label
 Function MakeLegalLabel$ (fileName As String, fileSize As Unsigned Long)
     Dim As Unsigned Long i
@@ -125,11 +134,6 @@ End Function
 ' This reads in fileNames and converts it to Base64 after compressing it (if needed)
 ' The file is then written as a QB64 include file
 Sub MakeResource (fileName As String)
-    If Not FileExists(fileName) Then
-        Print fileName; " does not exist!"
-        Exit Sub
-    End If
-
     Dim As String biFileName: biFileName = fileName + ".bi"
 
     If FileExists(biFileName) Then
@@ -139,20 +143,15 @@ Sub MakeResource (fileName As String)
 
     Print "Processing "; fileName
 
-    Dim As Long fh: fh = FreeFile
-    Open fileName For Binary Access Read As fh
-
-    Dim As Unsigned Long ogSize: ogSize = LOF(fh)
-
-    If ogSize < 1 Then
-        Print fileName; " is empty!"
-        Close fh
-        Exit Sub
-    End If
 
     ' Read in the whole file
-    Dim As String buffer: buffer = Input$(ogSize, fh)
-    Close fh
+    Dim As String buffer: buffer = LoadFile(fileName)
+    Dim As Unsigned Long ogSize: ogSize = Len(buffer)
+
+    If ogSize < 1 Then
+        Print fileName; " is empty or could not be read!"
+        Exit Sub
+    End If
 
 
     Print "File size is"; ogSize; "bytes"
@@ -160,8 +159,9 @@ Sub MakeResource (fileName As String)
     Print "Writing to "; biFileName
 
     ' Open the output file and write the label
+    Dim fh As Long: fh = FreeFile
     Open biFileName For Output As fh
-    Print #fh, MakeLegalLabel(GetFileNameFromPath$(fileName), ogSize) ' write the label
+    Print #fh, MakeLegalLabel(GetFileNameFromPathOrURL$(fileName), ogSize) ' write the label
 
     ' Attempt to compress and see if we get any goodness
     Dim As String compBuf: compBuf = Deflate$(buffer)
@@ -183,7 +183,7 @@ Sub MakeResource (fileName As String)
 
     Dim As Unsigned Long i
     For i = 1 To Len(buffer)
-        If (i - 1) Mod BASE64_CHARACTERS_PER_LINE = 0 Then
+        If (i - 1) Mod dataCPL = 0 Then
             If i > 1 Then Print #fh, NULLSTRING
             Print #fh, "Data ";
         End If
@@ -195,12 +195,14 @@ Sub MakeResource (fileName As String)
 
     Print "Done"
 End Sub
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 ' MODULE FILES
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
-'$Include:'./include/Base64.bas'
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
-'---------------------------------------------------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
+'$Include:'include/ProgramArgs.bas'
+'$Include:'include/FileOps.bas'
+'$Include:'include/Base64.bas'
+'-----------------------------------------------------------------------------------------------------------------------
+'-----------------------------------------------------------------------------------------------------------------------
 

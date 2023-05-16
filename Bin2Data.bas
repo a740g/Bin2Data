@@ -65,6 +65,7 @@ If CommandCount < 1 Or GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 Then
     Print "Note:"
     Print " * This will create filespec.bi"
     Print " * Bulk convert files using wildcards"
+    Print " * filespec can be a URL"
     Print " * If filespec.bi already exists, then it will not be overwritten"
     Print
     Print "Usage:"

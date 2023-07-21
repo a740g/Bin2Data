@@ -6,205 +6,230 @@
 '-----------------------------------------------------------------------------------------------------------------------
 ' HEADER FILES
 '-----------------------------------------------------------------------------------------------------------------------
-'$Include:'include/CRTLib.bi'
-'$Include:'include/FileOps.bi'
-'$Include:'include/Base64.bi'
+'$INCLUDE:'include/StringOps.bi'
+'$INCLUDE:'include/MathOps.bi'
+'$INCLUDE:'include/FileOps.bi'
+'$INCLUDE:'include/Base64.bi'
+'$INCLUDE:'include/Deflate.bi'
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' METACOMMANDS
 '-----------------------------------------------------------------------------------------------------------------------
-$NoPrefix
-$Console:Only
-$ExeIcon:'./Bin2Data.ico'
-$VersionInfo:ProductName=Bin2Data
-$VersionInfo:CompanyName=Samuel Gomes
-$VersionInfo:LegalCopyright=Copyright (c) 2023 Samuel Gomes
-$VersionInfo:LegalTrademarks=All trademarks are property of their respective owners
-$VersionInfo:Web=https://github.com/a740g
-$VersionInfo:Comments=https://github.com/a740g
-$VersionInfo:InternalName=Bin2Data
-$VersionInfo:OriginalFilename=Bin2Data.exe
-$VersionInfo:FileDescription=Bin2Data executable
-$VersionInfo:FILEVERSION#=1,1,0,0
-$VersionInfo:PRODUCTVERSION#=1,1,0,0
+$NOPREFIX
+$CONSOLE:ONLY
+$EXEICON:'./Bin2Data.ico'
+$VERSIONINFO:ProductName=Bin2Data
+$VERSIONINFO:CompanyName=Samuel Gomes
+$VERSIONINFO:LegalCopyright=Copyright (c) 2023 Samuel Gomes
+$VERSIONINFO:LegalTrademarks=All trademarks are property of their respective owners
+$VERSIONINFO:Web=https://github.com/a740g
+$VERSIONINFO:Comments=https://github.com/a740g
+$VERSIONINFO:InternalName=Bin2Data
+$VERSIONINFO:OriginalFilename=Bin2Data.exe
+$VERSIONINFO:FileDescription=Bin2Data executable
+$VERSIONINFO:FILEVERSION#=2,0,0,0
+$VERSIONINFO:PRODUCTVERSION#=2,0,0,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' CONSTANTS
 '-----------------------------------------------------------------------------------------------------------------------
-Const BASE64_CHARACTERS_PER_LINE_MIN = 1
-Const BASE64_CHARACTERS_PER_LINE_DEFAULT = 20 * 4
-Const BASE64_CHARACTERS_PER_LINE_MAX = 4096
+CONST BASE64_CHARACTERS_PER_LINE_MIN = 1
+CONST BASE64_CHARACTERS_PER_LINE_DEFAULT = 20 * 4
+CONST BASE64_CHARACTERS_PER_LINE_MAX = 4096
+CONST DEFLATE_COMPRESSION_LEVEL = 0 ' whatever the default for the library
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' GLOBAL VARIABLES
 '-----------------------------------------------------------------------------------------------------------------------
-Dim Shared dataCPL As Long: dataCPL = BASE64_CHARACTERS_PER_LINE_DEFAULT ' characters per data line
+DIM SHARED dataCPL AS LONG: dataCPL = BASE64_CHARACTERS_PER_LINE_DEFAULT ' characters per data line
+DIM SHARED deflateIterations AS UNSIGNED BYTE ' compression level
+DIM SHARED AS BYTE shouldOverwrite, shouldStore ' overwrite and compress flags
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' PROGRAM ENTRY POINT
 '-----------------------------------------------------------------------------------------------------------------------
 ' Change to the directory specified by the environment
-ChDir StartDir$
+CHDIR STARTDIR$
 
 ' If there are no command line parameters just show some info and exit
-If CommandCount < 1 Or GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 Then
-    Color 7
-    Print
-    Print "Bin2Data: Converts binary files to QB64 Data"
-    Print
-    Print "Copyright (c) 2023 Samuel Gomes"
-    Print
-    Print "https://github.com/a740g"
-    Print
-    Print "Usage: Bin2Data [-w characters_per_data_line] [filespec]"
-    Print "   -w: A number specifying the number of characters per line. Default"; dataCPL
-    Print
-    Print "Note:"
-    Print " * This will create filespec.bi"
-    Print " * Bulk convert files using wildcards"
-    Print " * filespec can be a URL"
-    Print " * If filespec.bi already exists, then it will not be overwritten"
-    Print
-    Print "Usage:"
-    Print " 1. Encode the binary file using Bin2Data"
-    Print " 2. Include the file or it's contents"
-    Print " 3. Include Base64.bi at the top of your source"
-    Print " 4. Include Base64.bas at the bottom of your source"
-    Print " 5. Load the file:"
-    Color 14
-    Print "     Restore label_generated_by_bin2data"
-    Print "     Dim buffer As String"
-    Print "     buffer = LoadResource"
-    Color 7
-    Print
-    System
-End If
+IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
+    COLOR 7
+    PRINT
+    PRINT "Bin2Data: Converts binary files to QB64 Data"
+    PRINT
+    PRINT "Copyright (c) 2023 Samuel Gomes"
+    PRINT
+    PRINT "https://github.com/a740g"
+    PRINT
+    PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-s] [-o] [filespec]"
+    PRINT "   -w: A number specifying the number of characters per line."; BASE64_CHARACTERS_PER_LINE_MIN; "-"; BASE64_CHARACTERS_PER_LINE_MAX; "(default"; STR$(dataCPL); ")"
+    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 - 255 (default 15)"
+    PRINT "   -s: Disable compression and store the file instead"
+    PRINT "   -o: Overwrite output file if it exists"
+    PRINT
+    PRINT "Note:"
+    PRINT " * This will create filespec.bi"
+    PRINT " * Bulk convert files using wildcards"
+    PRINT " * filespec can be a URL"
+    PRINT " * If filespec.bi exists, then it will not be overwritten (unless -o is specified)"
+    PRINT
+    PRINT "Usage:"
+    PRINT " 1. Encode the binary file using Bin2Data"
+    PRINT " 2. Include the file or it's contents"
+    PRINT " 3. Include Base64.bi at the top of your source"
+    PRINT " 4. Include Base64.bas at the bottom of your source"
+    PRINT " 5. Load the file:"
+    COLOR 14
+    PRINT "     Restore label_generated_by_bin2data"
+    PRINT "     Dim buffer As String"
+    PRINT "     buffer = LoadResource"
+    COLOR 7
+    PRINT
+    SYSTEM
+END IF
 
-Print
+PRINT
 
 ' Convert all files requested
-Dim argName As Integer
-Dim argIndex As Long: argIndex = 1 ' start with the first argument
+DIM argName AS INTEGER
+DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
 
-Do
-    argName = ToLower(GetProgramArgument("w", argIndex))
+DO
+    argName = ToLowerCase(GetProgramArgument("wiso", argIndex))
 
-    Select Case argName
-        Case -1 ' ' no more arguments
-            Exit Do
+    SELECT CASE argName
+        CASE -1 ' ' no more arguments
+            EXIT DO
 
-        Case KEY_LOWER_W ' w
+        CASE KEY_LOWER_W ' w
             argIndex = argIndex + 1 ' value at next index
-            dataCPL = ClampLong(Val(Command$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
-            Print "Characters per data line set to"; dataCPL
+            dataCPL = ClampLong(VAL(COMMAND$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
+            PRINT "Characters per data line set to"; dataCPL
 
-        Case Else ' probably a file name
-            MakeResource Command$(argIndex)
-    End Select
+        CASE KEY_LOWER_I ' i
+            argIndex = argIndex + 1 ' value at next index
+            deflateIterations = ClampLong(VAL(COMMAND$(argIndex)), 1, 255)
+            PRINT "Compression level set to"; deflateIterations
+
+        CASE KEY_LOWER_S
+            shouldStore = TRUE
+            PRINT "Store mode enabled"
+
+        CASE KEY_LOWER_O
+            shouldOverwrite = TRUE
+            PRINT "Overwrite mode enabled"
+
+        CASE ELSE ' probably a file name
+            MakeResource COMMAND$(argIndex)
+    END SELECT
 
     argIndex = argIndex + 1 ' move to the next index
-Loop Until argName = -1
+LOOP UNTIL argName = -1
 
-System
+SYSTEM
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' FUNCTIONS & SUBROUTINES
 '-----------------------------------------------------------------------------------------------------------------------
 ' Removes invalid characters from filenames and makes a valid QB64 line label
-Function MakeLegalLabel$ (fileName As String, fileSize As Unsigned Long)
-    Dim As Unsigned Long i
-    Dim As String label: label = fileName
+FUNCTION MakeLegalLabel$ (fileName AS STRING, fileSize AS UNSIGNED LONG)
+    DIM AS UNSIGNED LONG i
+    DIM AS STRING label: label = fileName
 
-    For i = 1 To Len(label)
-        Select Case Asc(label, i)
-            Case KEY_0 To KEY_9, KEY_UPPER_A To KEY_UPPER_Z, KEY_LOWER_A To KEY_LOWER_Z, KEY_UNDERSCORE ' legal characters
+    FOR i = 1 TO LEN(label)
+        SELECT CASE ASC(label, i)
+            CASE KEY_0 TO KEY_9, KEY_UPPER_A TO KEY_UPPER_Z, KEY_LOWER_A TO KEY_LOWER_Z, KEY_UNDERSCORE ' legal characters
                 ' NOP
-            Case Else
-                Asc(label, i) = KEY_UNDERSCORE ' replace with underscore
-        End Select
-    Next
+            CASE ELSE
+                ASC(label, i) = KEY_UNDERSCORE ' replace with underscore
+        END SELECT
+    NEXT
 
-    MakeLegalLabel = "Data_" + label + "_" + Trim$(Str$(fileSize)) + ":"
-End Function
+    MakeLegalLabel = "Data_" + label + "_" + TRIM$(STR$(fileSize)) + ":"
+END FUNCTION
 
 
 ' This reads in fileNames and converts it to Base64 after compressing it (if needed)
 ' The file is then written as a QB64 include file
-Sub MakeResource (fileName As String)
-    Dim As String biFileName: biFileName = fileName + ".bi"
+SUB MakeResource (fileName AS STRING)
+    DIM AS STRING biFileName: biFileName = fileName + ".bi"
 
-    If FileExists(biFileName) Then
-        Print biFileName; " already exists!"
-        Exit Sub
-    End If
+    IF FILEEXISTS(biFileName) AND NOT shouldOverwrite THEN
+        PRINT biFileName; " already exists!"
+        EXIT SUB
+    END IF
 
-    Print "Processing "; fileName
+    PRINT "Loading "; fileName
 
 
     ' Read in the whole file
-    Dim As String buffer: buffer = LoadFile(fileName)
-    Dim As Unsigned Long ogSize: ogSize = Len(buffer)
+    DIM AS STRING buffer: buffer = LoadFile(fileName)
+    DIM AS UNSIGNED LONG ogSize: ogSize = LEN(buffer)
 
-    If ogSize < 1 Then
-        Print fileName; " is empty or could not be read!"
-        Exit Sub
-    End If
+    IF ogSize < 1 THEN
+        PRINT fileName; " is empty or could not be read!"
+        EXIT SUB
+    END IF
 
 
-    Print "File size is"; ogSize; "bytes"
-
-    Print "Writing to "; biFileName
-
-    ' Open the output file and write the label
-    Dim fh As Long: fh = FreeFile
-    Open biFileName For Output As fh
-    Print #fh, MakeLegalLabel(GetFileNameFromPathOrURL$(fileName), ogSize) ' write the label
+    PRINT "File size is"; ogSize; "bytes"
 
     ' Attempt to compress and see if we get any goodness
-    Dim As String compBuf: compBuf = Deflate$(buffer)
+    IF NOT shouldStore THEN
+        PRINT "Compressing data (this may take some time)"
+        DIM AS STRING compBuf: compBuf = DeflatePro(buffer, deflateIterations)
+    END IF
 
-    If Len(compBuf) < ogSize Then ' we got goodness
+    PRINT "Writing to "; biFileName
+
+    ' Open the output file and write the label
+    DIM fh AS LONG: fh = FREEFILE
+    OPEN biFileName FOR OUTPUT AS fh
+    PRINT #fh, MakeLegalLabel(GetFileNameFromPathOrURL$(fileName), ogSize) ' write the label
+
+    IF LEN(compBuf) < ogSize AND NOT shouldStore THEN ' we got goodness
         buffer = EncodeBase64(compBuf) ' we do not need the original buffer contents
-        Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(TRUE))
+        PRINT #fh, "Data "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE))
 
-        Print Using "Compressed###.##%"; 100 - 100! * Len(compBuf) / ogSize
+        PRINT USING "Compressed###.##%"; 100 - 100! * LEN(compBuf) / ogSize
 
-        compBuf = NULLSTRING
-    Else ' no goodness
+        compBuf = EMPTY_STRING
+    ELSE ' no goodness
         buffer = EncodeBase64(buffer) ' we do not need the original buffer contents
-        Print #fh, "Data "; LTrim$(Str$(ogSize)); ","; LTrim$(Str$(Len(buffer))); ","; LTrim$(Str$(FALSE))
-        compBuf = NULLSTRING
+        PRINT #fh, "Data "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE))
+        compBuf = EMPTY_STRING
 
-        Print "Stored"
-    End If
+        PRINT "Stored"
+    END IF
 
-    Dim As Unsigned Long i
-    For i = 1 To Len(buffer)
-        If (i - 1) Mod dataCPL = 0 Then
-            If i > 1 Then Print #fh, NULLSTRING
-            Print #fh, "Data ";
-        End If
+    DIM AS UNSIGNED LONG i
+    FOR i = 1 TO LEN(buffer)
+        IF (i - 1) MOD dataCPL = 0 THEN
+            IF i > 1 THEN PRINT #fh, EMPTY_STRING
+            PRINT #fh, "Data ";
+        END IF
 
-        Print #fh, Chr$(Asc(buffer, i));
-    Next
+        PRINT #fh, CHR$(ASC(buffer, i));
+    NEXT
 
-    Close fh
+    CLOSE fh
 
-    Print "Done"
-End Sub
+    PRINT "Done"
+END SUB
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' MODULE FILES
 '-----------------------------------------------------------------------------------------------------------------------
-'$Include:'include/ProgramArgs.bas'
-'$Include:'include/FileOps.bas'
-'$Include:'include/Base64.bas'
+'$INCLUDE:'include/ProgramArgs.bas'
+'$INCLUDE:'include/StringOps.bas'
+'$INCLUDE:'include/FileOps.bas'
+'$INCLUDE:'include/Base64.bas'
+'$INCLUDE:'include/Deflate.bas'
 '-----------------------------------------------------------------------------------------------------------------------
 '-----------------------------------------------------------------------------------------------------------------------
-

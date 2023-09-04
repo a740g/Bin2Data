@@ -1,6 +1,6 @@
 # BIN2DATA
 
-Bin2Data and it's companion library is written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that allows for the conversion of binary files to Base64 encoded `DATA` statements. This library not only encodes binary data into Base64, but also allows for the decoding of Base64 encoded data back into its binary form. The data is optionally compressed using QB64's `DEFLATE$` if it sees any goodness. This means that files that are already compressed, may not go through one more compression step.
+Bin2Data and it's companion library is written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that allows for the conversion of binary files to Base64 encoded [DATA](https://qb64phoenix.com/qb64wiki/index.php/DATA) statements. This library not only encodes binary data into Base64, but also allows for the decoding of Base64 encoded data back into its binary form. The data is optionally compressed using Google's [Zopfli](https://github.com/google/zopfli) compression library if it sees any goodness. This means that files that are already compressed, may not go through one more compression step. The compressed data is compatible with QB64-PE's [_DEFLATE$](https://qb64phoenix.com/qb64wiki/index.php/DEFLATE$).
 
 ![Screenshot](screenshot.png)
 
@@ -24,31 +24,41 @@ With this library, you can easily store binary data within your QB64 programs, m
 Assuming the a file has been encoded using Bin2Data, here's an example of how you can use the library to to decode Base64 encoded data.
 
 ```vb
-' In this example we used Bin2Data on my_music.mp3 and it create a file called my_music.mp3.bi
+' In this example we used Bin2Data on my_music.mp3 and it created a file called my_music.mp3.bi
+' It assumes that you have cloned the Toolbox64 repo in the include subdirectory under your project directory
 
-'$Include:'./include/Base64.bi'
+' First include the Base64 header file
+'$INCLUDE:'include/Base64.bi'
 
-Restore Data_my_music_8192  ' this label is from my_music_mp3.bi
-Dim As String buffer
-buffer = LoadResource
+' This label is from my_music_mp3.bi
+RESTORE data_my_music_mp3_8192
+
+' This loads the encoded & compressed data from the DATA statements after the label above
+DIM buffer AS STRING: buffer = LoadResource 
 
 ' Now do something with buffer
 ...
 
-' Place contents of my_music_mp3.bi here
-Data_my_music_8192:
-Data 8192,9877,0
-Data ...
+' Include the my_music.mp3.bi before your FUNCTIONs and SUBs
+'$INCLUDE:'my_music_mp3.bi'
 
-'$Include:'./include/Base64.bas'
+' OR
+
+' Place contents of my_music_mp3.bi before your FUNCTIONs and SUBs
+data_my_music_mp3_8192:
+DATA 8192,9877,0
+DATA ...
+
+' Finally, don't forget to include the Base64 module file
+'$INCLUDE:'include/Base64.bas'
 ```
 
 ## API
 
 ```vb
-Function EncodeBase64$ (s As String)
-Function DecodeBase64$ (s As String)
-Function LoadResource$
+FUNCTION EncodeBase64$ (s AS STRING)
+FUNCTION DecodeBase64$ (s AS STRING)
+FUNCTION LoadResource$
 ```
 
 ## NOTES

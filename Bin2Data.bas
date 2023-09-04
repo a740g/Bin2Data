@@ -28,24 +28,24 @@ $VERSIONINFO:Comments=https://github.com/a740g
 $VERSIONINFO:InternalName=Bin2Data
 $VERSIONINFO:OriginalFilename=Bin2Data.exe
 $VERSIONINFO:FileDescription=Bin2Data executable
-$VERSIONINFO:FILEVERSION#=2,0,0,0
-$VERSIONINFO:PRODUCTVERSION#=2,0,0,0
+$VERSIONINFO:FILEVERSION#=2,0,1,0
+$VERSIONINFO:PRODUCTVERSION#=2,0,1,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' CONSTANTS
 '-----------------------------------------------------------------------------------------------------------------------
-CONST BASE64_CHARACTERS_PER_LINE_MIN = 1
-CONST BASE64_CHARACTERS_PER_LINE_DEFAULT = 20 * 4
+CONST BASE64_CHARACTERS_PER_LINE_MIN = SIZE_OF_BYTE
+CONST BASE64_CHARACTERS_PER_LINE_DEFAULT = 28 * SIZE_OF_LONG
 CONST BASE64_CHARACTERS_PER_LINE_MAX = 4096
-CONST DEFLATE_COMPRESSION_LEVEL = 0 ' whatever the default for the library
+CONST DEFLATE_COMPRESSION_LEVEL = 0 ' whatever is the default for the library
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' GLOBAL VARIABLES
 '-----------------------------------------------------------------------------------------------------------------------
 DIM SHARED dataCPL AS LONG: dataCPL = BASE64_CHARACTERS_PER_LINE_DEFAULT ' characters per data line
-DIM SHARED deflateIterations AS UNSIGNED BYTE ' compression level
+DIM SHARED deflateIterations AS UNSIGNED INTEGER ' compression level
 DIM SHARED AS BYTE shouldOverwrite, shouldStore ' overwrite and compress flags
 '-----------------------------------------------------------------------------------------------------------------------
 
@@ -67,7 +67,7 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per line."; BASE64_CHARACTERS_PER_LINE_MIN; "-"; BASE64_CHARACTERS_PER_LINE_MAX; "(default"; STR$(dataCPL); ")"
-    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 - 255 (default 15)"
+    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; UINTEGER_MAX; "(default 15)"
     PRINT "   -s: Disable compression and store the file instead"
     PRINT "   -o: Overwrite output file if it exists"
     PRINT
@@ -84,8 +84,8 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT " 4. Include Base64.bas at the bottom of your source"
     PRINT " 5. Load the file:"
     COLOR 14
-    PRINT "     Restore label_generated_by_bin2data"
-    PRINT "     Dim buffer As String"
+    PRINT "     RESTORE label_generated_by_bin2data"
+    PRINT "     DIM buffer AS STRING"
     PRINT "     buffer = LoadResource"
     COLOR 7
     PRINT
@@ -112,7 +112,7 @@ DO
 
         CASE KEY_LOWER_I ' i
             argIndex = argIndex + 1 ' value at next index
-            deflateIterations = ClampLong(VAL(COMMAND$(argIndex)), 1, 255)
+            deflateIterations = ClampLong(VAL(COMMAND$(argIndex)), 1, UINTEGER_MAX)
             PRINT "Compression level set to"; deflateIterations
 
         CASE KEY_LOWER_S
@@ -137,27 +137,41 @@ SYSTEM
 ' FUNCTIONS & SUBROUTINES
 '-----------------------------------------------------------------------------------------------------------------------
 ' Removes invalid characters from filenames and makes a valid QB64 line label
+' This will limit the label size to 40 characters (QB64 max)
 FUNCTION MakeLegalLabel$ (fileName AS STRING, fileSize AS UNSIGNED LONG)
-    DIM AS UNSIGNED LONG i
-    DIM AS STRING label: label = fileName
+    CONST LABEL_LENGTH_MAX = 40
 
-    FOR i = 1 TO LEN(label)
-        SELECT CASE ASC(label, i)
+    DIM nameText AS STRING: nameText = fileName
+
+    DIM i AS UNSIGNED LONG: FOR i = 1 TO LEN(nameText)
+        SELECT CASE ASC(nameText, i)
             CASE KEY_0 TO KEY_9, KEY_UPPER_A TO KEY_UPPER_Z, KEY_LOWER_A TO KEY_LOWER_Z, KEY_UNDERSCORE ' legal characters
                 ' NOP
             CASE ELSE
-                ASC(label, i) = KEY_UNDERSCORE ' replace with underscore
+                ASC(nameText, i) = KEY_UNDERSCORE ' replace with underscore
         END SELECT
     NEXT
 
-    MakeLegalLabel = "Data_" + label + "_" + TRIM$(STR$(fileSize)) + ":"
+    DIM sizeText AS STRING: sizeText = TRIM$(STR$(fileSize))
+    i = LABEL_LENGTH_MAX - LEN(sizeText) - 6 ' LABEL_LENGTH_MAX - text size of file size - len("data_" + "_")
+    IF LEN(nameText) > i THEN nameText = LEFT$(nameText, i) ' chop the name if everything is adding up to be more than LABEL_LENGTH_MAX chars
+
+    MakeLegalLabel = "data_" + LCASE$(nameText) + "_" + sizeText + ":"
 END FUNCTION
 
 
 ' This reads in fileNames and converts it to Base64 after compressing it (if needed)
-' The file is then written as a QB64 include file
+' The file is then written as a QB64 header file
 SUB MakeResource (fileName AS STRING)
-    DIM AS STRING biFileName: biFileName = fileName + ".bi"
+    CONST HEADER_FILE_EXTENSION = ".bi"
+
+    DIM biFileName AS STRING
+
+    IF LEN(GetDriveOrSchemeFromPathOrURL(fileName)) > 2 THEN
+        biFileName = GetLegalFileName(GetFileNameFromPathOrURL$(fileName)) + HEADER_FILE_EXTENSION
+    ELSE
+        biFileName = fileName + HEADER_FILE_EXTENSION
+    END IF
 
     IF FILEEXISTS(biFileName) AND NOT shouldOverwrite THEN
         PRINT biFileName; " already exists!"
@@ -166,23 +180,22 @@ SUB MakeResource (fileName AS STRING)
 
     PRINT "Loading "; fileName
 
-
     ' Read in the whole file
-    DIM AS STRING buffer: buffer = LoadFile(fileName)
-    DIM AS UNSIGNED LONG ogSize: ogSize = LEN(buffer)
+    DIM buffer AS STRING: buffer = LoadFile(fileName)
+    DIM ogSize AS UNSIGNED LONG: ogSize = LEN(buffer)
 
     IF ogSize < 1 THEN
         PRINT fileName; " is empty or could not be read!"
         EXIT SUB
     END IF
 
-
     PRINT "File size is"; ogSize; "bytes"
 
     ' Attempt to compress and see if we get any goodness
     IF NOT shouldStore THEN
-        PRINT "Compressing data (this may take some time)"
-        DIM AS STRING compBuf: compBuf = DeflatePro(buffer, deflateIterations)
+        PRINT "Compressing data (this may take some time) ... ";
+        DIM compBuf AS STRING: compBuf = DeflatePro(buffer, deflateIterations)
+        PRINT "done"
     END IF
 
     PRINT "Writing to "; biFileName
@@ -193,25 +206,30 @@ SUB MakeResource (fileName AS STRING)
     PRINT #fh, MakeLegalLabel(GetFileNameFromPathOrURL$(fileName), ogSize) ' write the label
 
     IF LEN(compBuf) < ogSize AND NOT shouldStore THEN ' we got goodness
+        PRINT "Encoding data (this may take some time) ... ";
         buffer = EncodeBase64(compBuf) ' we do not need the original buffer contents
-        PRINT #fh, "Data "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE))
+        PRINT "done"
+
+        PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE))
 
         PRINT USING "Compressed###.##%"; 100 - 100! * LEN(compBuf) / ogSize
 
         compBuf = EMPTY_STRING
     ELSE ' no goodness
+        PRINT "Encoding data (this may take some time) ... ";
         buffer = EncodeBase64(buffer) ' we do not need the original buffer contents
-        PRINT #fh, "Data "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE))
+        PRINT "done"
+
+        PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE))
         compBuf = EMPTY_STRING
 
         PRINT "Stored"
     END IF
 
-    DIM AS UNSIGNED LONG i
-    FOR i = 1 TO LEN(buffer)
+    DIM i AS UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
         IF (i - 1) MOD dataCPL = 0 THEN
             IF i > 1 THEN PRINT #fh, EMPTY_STRING
-            PRINT #fh, "Data ";
+            PRINT #fh, "DATA ";
         END IF
 
         PRINT #fh, CHR$(ASC(buffer, i));

@@ -1,6 +1,6 @@
 # BIN2DATA
 
-Bin2Data and it's companion library is written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that allows for the conversion of binary files to Base64 encoded [DATA](https://qb64phoenix.com/qb64wiki/index.php/DATA) statements. This library not only encodes binary data into Base64, but also allows for the decoding of Base64 encoded data back into its binary form. The data is optionally compressed using Google's [Zopfli](https://github.com/google/zopfli) compression library if it sees any goodness. This means that files that are already compressed, may not go through one more compression step. The compressed data is compatible with QB64-PE's [_DEFLATE$](https://qb64phoenix.com/qb64wiki/index.php/DEFLATE$).
+Bin2Data and it's companion library is written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that allows for the conversion of binary files to Base64 encoded [DATA](https://qb64phoenix.com/qb64wiki/index.php/DATA) statements. This library not only encodes binary data into Base64, but also allows for the decoding of Base64 encoded data back into its binary form. The data is optionally compressed using Google's [Zopfli](https://github.com/google/zopfli) compression library if it sees any goodness. This means that files that are already compressed, may not go through one more compression and decompression step. The compressed data is compatible with QB64-PE's [_DEFLATE$](https://qb64phoenix.com/qb64wiki/index.php/DEFLATE$).
 
 ![Screenshot](screenshot.png)
 

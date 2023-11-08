@@ -1,5 +1,5 @@
 '-----------------------------------------------------------------------------------------------------------------------
-' Binary to Data converter using Base64 library
+' QB64-PE Binary to DATA converter
 ' Copyright (c) 2023 Samuel Gomes
 '-----------------------------------------------------------------------------------------------------------------------
 
@@ -19,17 +19,17 @@
 $NOPREFIX
 $CONSOLE:ONLY
 $EXEICON:'./Bin2Data.ico'
-$VERSIONINFO:ProductName=Bin2Data
-$VERSIONINFO:CompanyName=Samuel Gomes
-$VERSIONINFO:LegalCopyright=Copyright (c) 2023 Samuel Gomes
-$VERSIONINFO:LegalTrademarks=All trademarks are property of their respective owners
-$VERSIONINFO:Web=https://github.com/a740g
-$VERSIONINFO:Comments=https://github.com/a740g
-$VERSIONINFO:InternalName=Bin2Data
-$VERSIONINFO:OriginalFilename=Bin2Data.exe
-$VERSIONINFO:FileDescription=Bin2Data executable
-$VERSIONINFO:FILEVERSION#=2,0,1,0
-$VERSIONINFO:PRODUCTVERSION#=2,0,1,0
+$VERSIONINFO:ProductName='Bin2Data'
+$VERSIONINFO:CompanyName='Samuel Gomes'
+$VERSIONINFO:LegalCopyright='Copyright (c) 2023 Samuel Gomes'
+$VERSIONINFO:LegalTrademarks='All trademarks are property of their respective owners'
+$VERSIONINFO:Web='https://github.com/a740g'
+$VERSIONINFO:Comments='https://github.com/a740g'
+$VERSIONINFO:InternalName='Bin2Data'
+$VERSIONINFO:OriginalFilename='Bin2Data.exe'
+$VERSIONINFO:FileDescription='Bin2Data executable'
+$VERSIONINFO:FILEVERSION#=2,1,0,0
+$VERSIONINFO:PRODUCTVERSION#=2,1,0,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ CHDIR STARTDIR$
 IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     COLOR 7
     PRINT
-    PRINT "Bin2Data: Converts binary files to QB64 Data"
+    PRINT "Bin2Data: Converts binary files to QB64-PE DATA"
     PRINT
     PRINT "Copyright (c) 2023 Samuel Gomes"
     PRINT
@@ -86,7 +86,7 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     COLOR 14
     PRINT "     RESTORE label_generated_by_bin2data"
     PRINT "     DIM buffer AS STRING"
-    PRINT "     buffer = LoadResource"
+    PRINT "     buffer = Base64_LoadResource"
     COLOR 7
     PRINT
     SYSTEM
@@ -107,12 +107,12 @@ DO
 
         CASE KEY_LOWER_W ' w
             argIndex = argIndex + 1 ' value at next index
-            dataCPL = ClampLong(VAL(COMMAND$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
+            dataCPL = Math_ClampLong(VAL(COMMAND$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
             PRINT "Characters per data line set to"; dataCPL
 
         CASE KEY_LOWER_I ' i
             argIndex = argIndex + 1 ' value at next index
-            deflateIterations = ClampLong(VAL(COMMAND$(argIndex)), 1, UINTEGER_MAX)
+            deflateIterations = Math_ClampLong(VAL(COMMAND$(argIndex)), 1, UINTEGER_MAX)
             PRINT "Compression level set to"; deflateIterations
 
         CASE KEY_LOWER_S
@@ -207,7 +207,7 @@ SUB MakeResource (fileName AS STRING)
 
     IF LEN(compBuf) < ogSize AND NOT shouldStore THEN ' we got goodness
         PRINT "Encoding data (this may take some time) ... ";
-        buffer = EncodeBase64(compBuf) ' we do not need the original buffer contents
+        buffer = Base64_Encode(compBuf) ' we do not need the original buffer contents
         PRINT "done"
 
         PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE))
@@ -217,7 +217,7 @@ SUB MakeResource (fileName AS STRING)
         compBuf = EMPTY_STRING
     ELSE ' no goodness
         PRINT "Encoding data (this may take some time) ... ";
-        buffer = EncodeBase64(buffer) ' we do not need the original buffer contents
+        buffer = Base64_Encode(buffer) ' we do not need the original buffer contents
         PRINT "done"
 
         PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE))

@@ -34,7 +34,7 @@ Assuming the a file has been encoded using Bin2Data, here's an example of how yo
 RESTORE data_my_music_mp3_8192
 
 ' This loads the encoded & compressed data from the DATA statements after the label above
-DIM buffer AS STRING: buffer = LoadResource 
+DIM buffer AS STRING: buffer = Base64_LoadResource 
 
 ' Now do something with buffer
 ...
@@ -56,9 +56,9 @@ DATA ...
 ## API
 
 ```vb
-FUNCTION EncodeBase64$ (s AS STRING)
-FUNCTION DecodeBase64$ (s AS STRING)
-FUNCTION LoadResource$
+FUNCTION Base64_Encode$ (s AS STRING)
+FUNCTION Base64_Decode$ (s AS STRING)
+FUNCTION Base64_LoadResource$
 ```
 
 ## NOTES

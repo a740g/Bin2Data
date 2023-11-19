@@ -28,8 +28,8 @@ $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,1,0,0
-$VERSIONINFO:PRODUCTVERSION#=2,1,0,0
+$VERSIONINFO:FILEVERSION#=2,2,0,0
+$VERSIONINFO:PRODUCTVERSION#=2,2,0,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -39,6 +39,10 @@ CONST BASE64_CHARACTERS_PER_LINE_MIN = SIZE_OF_BYTE
 CONST BASE64_CHARACTERS_PER_LINE_DEFAULT = 28 * SIZE_OF_LONG
 CONST BASE64_CHARACTERS_PER_LINE_MAX = 4096
 CONST DEFLATE_COMPRESSION_LEVEL = 0 ' whatever is the default for the library
+CONST IDENTIFIER_STYLE_DATA = 0
+CONST IDENTIFIER_STYLE_NAME = 1
+CONST IDENTIFIER_STYLE_SIZE = 2
+CONST IDENTIFIER_STYLE_COMP = 3
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -46,7 +50,7 @@ CONST DEFLATE_COMPRESSION_LEVEL = 0 ' whatever is the default for the library
 '-----------------------------------------------------------------------------------------------------------------------
 DIM SHARED dataCPL AS LONG: dataCPL = BASE64_CHARACTERS_PER_LINE_DEFAULT ' characters per data line
 DIM SHARED deflateIterations AS UNSIGNED INTEGER ' compression level
-DIM SHARED AS BYTE shouldOverwrite, shouldStore ' overwrite and compress flags
+DIM SHARED AS BYTE shouldOverwrite, shouldStore, shouldGenCONST ' overwrite, compress and const enable flags
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -58,16 +62,14 @@ CHDIR STARTDIR$
 ' If there are no command line parameters just show some info and exit
 IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     COLOR 7
-    PRINT
-    PRINT "Bin2Data: Converts binary files to QB64-PE DATA"
-    PRINT
+    PRINT "Bin2Data: Converts binary files to QB64-PE DATA / CONST"
     PRINT "Copyright (c) 2023 Samuel Gomes"
-    PRINT
     PRINT "https://github.com/a740g"
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per line."; BASE64_CHARACTERS_PER_LINE_MIN; "-"; BASE64_CHARACTERS_PER_LINE_MAX; "(default"; STR$(dataCPL); ")"
     PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; UINTEGER_MAX; "(default 15)"
+    PRINT "   -c: Store the data in a CONST rather than DATA"
     PRINT "   -s: Disable compression and store the file instead"
     PRINT "   -o: Overwrite output file if it exists"
     PRINT
@@ -83,12 +85,19 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT " 3. Include Base64.bi at the top of your source"
     PRINT " 4. Include Base64.bas at the bottom of your source"
     PRINT " 5. Load the file:"
+    COLOR 11
+    PRINT "     DATA mode:"
     COLOR 14
-    PRINT "     RESTORE label_generated_by_bin2data"
-    PRINT "     DIM buffer AS STRING"
-    PRINT "     buffer = Base64_LoadResource"
-    COLOR 7
+    PRINT "         RESTORE label_generated_by_bin2data"
+    PRINT "         DIM buffer AS STRING"
+    PRINT "         buffer = Base64_LoadResourceData"
     PRINT
+    COLOR 11
+    PRINT "     CONST mode:"
+    COLOR 14
+    PRINT "         DIM buffer AS STRING"
+    PRINT "         buffer = Base64_LoadResourceString(STRING_DATA_CONST, ORIGINAL_SIZE_CONST, IS_COMPRESSED_CONST)"
+    COLOR 7
     SYSTEM
 END IF
 
@@ -99,21 +108,25 @@ DIM argName AS INTEGER
 DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
 
 DO
-    argName = ToLowerCase(GetProgramArgument("wiso", argIndex))
+    argName = ToLowerCase(GetProgramArgument("wicso", argIndex))
 
     SELECT CASE argName
         CASE -1 ' ' no more arguments
             EXIT DO
 
-        CASE KEY_LOWER_W ' w
+        CASE KEY_LOWER_W
             argIndex = argIndex + 1 ' value at next index
             dataCPL = Math_ClampLong(VAL(COMMAND$(argIndex)), BASE64_CHARACTERS_PER_LINE_MIN, BASE64_CHARACTERS_PER_LINE_MAX)
             PRINT "Characters per data line set to"; dataCPL
 
-        CASE KEY_LOWER_I ' i
+        CASE KEY_LOWER_I
             argIndex = argIndex + 1 ' value at next index
             deflateIterations = Math_ClampLong(VAL(COMMAND$(argIndex)), 1, UINTEGER_MAX)
             PRINT "Compression level set to"; deflateIterations
+
+        CASE KEY_LOWER_C
+            shouldGenCONST = TRUE
+            PRINT "CONST generation enabled"
 
         CASE KEY_LOWER_S
             shouldStore = TRUE
@@ -136,10 +149,16 @@ SYSTEM
 '-----------------------------------------------------------------------------------------------------------------------
 ' FUNCTIONS & SUBROUTINES
 '-----------------------------------------------------------------------------------------------------------------------
-' Removes invalid characters from filenames and makes a valid QB64 line label
+' Removes invalid characters from filenames and makes a valid QB64 identifier
 ' This will limit the label size to 40 characters (QB64 max)
-FUNCTION MakeLegalLabel$ (fileName AS STRING, fileSize AS UNSIGNED LONG)
+FUNCTION MakeLegalIdentifier$ (fileName AS STRING, fileSize AS UNSIGNED LONG, style AS LONG)
     CONST LABEL_LENGTH_MAX = 40
+    CONST PREFIX_DATA = "data_"
+    CONST PREFIX_SIZE = "SIZE_"
+    CONST PREFIX_COMP = "COMP_"
+    CONST CONST_KEYWORD = "CONST "
+    CONST ASSIGNMENT_STRING = " ="
+    CONST LABEL_TERMINATOR = ":"
 
     DIM nameText AS STRING: nameText = fileName
 
@@ -152,11 +171,24 @@ FUNCTION MakeLegalLabel$ (fileName AS STRING, fileSize AS UNSIGNED LONG)
         END SELECT
     NEXT
 
-    DIM sizeText AS STRING: sizeText = TRIM$(STR$(fileSize))
+    DIM sizeText AS STRING: sizeText = LTRIM$(STR$(fileSize))
     i = LABEL_LENGTH_MAX - LEN(sizeText) - 6 ' LABEL_LENGTH_MAX - text size of file size - len("data_" + "_")
     IF LEN(nameText) > i THEN nameText = LEFT$(nameText, i) ' chop the name if everything is adding up to be more than LABEL_LENGTH_MAX chars
+    nameText = nameText + "_" + sizeText
 
-    MakeLegalLabel = "data_" + LCASE$(nameText) + "_" + sizeText + ":"
+    SELECT CASE style
+        CASE IDENTIFIER_STYLE_NAME
+            MakeLegalIdentifier = CONST_KEYWORD + UCASE$(PREFIX_DATA + nameText) + ASSIGNMENT_STRING
+
+        CASE IDENTIFIER_STYLE_SIZE
+            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_SIZE + UCASE$(nameText) + ASSIGNMENT_STRING
+
+        CASE IDENTIFIER_STYLE_COMP
+            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_COMP + UCASE$(nameText) + ASSIGNMENT_STRING
+
+        CASE ELSE ' IDENTIFIER_STYLE_DATA
+            MakeLegalIdentifier = PREFIX_DATA + LCASE$(nameText) + LABEL_TERMINATOR
+    END SELECT
 END FUNCTION
 
 
@@ -203,14 +235,23 @@ SUB MakeResource (fileName AS STRING)
     ' Open the output file and write the label
     DIM fh AS LONG: fh = FREEFILE
     OPEN biFileName FOR OUTPUT AS fh
-    PRINT #fh, MakeLegalLabel(GetFileNameFromPathOrURL$(fileName), ogSize) ' write the label
+
+    IF shouldGenCONST THEN
+        PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_SIZE) + STR$(ogSize) ' write the size const
+    ELSE
+        PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_DATA) ' write the label
+    END IF
 
     IF LEN(compBuf) < ogSize AND NOT shouldStore THEN ' we got goodness
         PRINT "Encoding data (this may take some time) ... ";
         buffer = Base64_Encode(compBuf) ' we do not need the original buffer contents
         PRINT "done"
 
-        PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE))
+        IF shouldGenCONST THEN
+            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(TRUE) ' write if file is compressed
+        ELSE
+            PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE)) ' write the DATA header
+        END IF
 
         PRINT USING "Compressed###.##%"; 100 - 100! * LEN(compBuf) / ogSize
 
@@ -220,20 +261,60 @@ SUB MakeResource (fileName AS STRING)
         buffer = Base64_Encode(buffer) ' we do not need the original buffer contents
         PRINT "done"
 
-        PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE))
-        compBuf = EMPTY_STRING
-
-        PRINT "Stored"
-    END IF
-
-    DIM i AS UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
-        IF (i - 1) MOD dataCPL = 0 THEN
-            IF i > 1 THEN PRINT #fh, EMPTY_STRING
-            PRINT #fh, "DATA ";
+        IF shouldGenCONST THEN
+            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(FALSE) ' write if file is compressed
+        ELSE
+            PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE)) ' write the DATA header
         END IF
 
-        PRINT #fh, CHR$(ASC(buffer, i));
-    NEXT
+        PRINT "Stored"
+
+        compBuf = EMPTY_STRING
+    END IF
+
+    IF shouldGenCONST THEN PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME); ' write the name const without newline
+
+    DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD dataCPL ' remainder
+    DIM srcSizeMul AS _UNSIGNED LONG: srcSizeMul = LEN(buffer) - srcSizeRem ' exact multiple
+
+    DIM i AS UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP dataCPL
+        IF shouldGenCONST THEN
+            PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
+        ELSE
+            PRINT #fh, "DATA "; ' start of line DATA statement
+        END IF
+
+        PRINT #fh, MID$(buffer, i, dataCPL); ' the actual data chunk
+
+        IF shouldGenCONST THEN
+            PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' closing quotation mark
+
+            ' Now check if we need to write the line continuation combo for CONST string
+            IF srcSizeRem > 0 OR i < srcSizeMul - dataCPL THEN
+                PRINT #fh, " + _" ' write a line continuation
+            ELSE
+                PRINT #fh, EMPTY_STRING ' move to the next line
+            END IF
+        ELSE
+            PRINT #fh, EMPTY_STRING ' nothing special for DATA, simply move to the next line
+        END IF
+    NEXT i
+
+    IF srcSizeRem > 0 THEN
+        IF shouldGenCONST THEN
+            PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
+        ELSE
+            PRINT #fh, "DATA "; ' start of line DATA statement
+        END IF
+
+        PRINT #fh, MID$(buffer, i, dataCPL); ' the actual data chunk
+
+        IF shouldGenCONST THEN
+            PRINT #fh, CHR$(KEY_QUOTATION_MARK) ' closing quotation mark
+        ELSE
+            PRINT #fh, EMPTY_STRING ' nothing special for DATA, simply move to the next line
+        END IF
+    END IF
 
     CLOSE fh
 

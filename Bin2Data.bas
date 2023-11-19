@@ -69,7 +69,7 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per line."; BASE64_CHARACTERS_PER_LINE_MIN; "-"; BASE64_CHARACTERS_PER_LINE_MAX; "(default"; STR$(dataCPL); ")"
     PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; UINTEGER_MAX; "(default 15)"
-    PRINT "   -c: Store the data in a CONST rather than DATA"
+    PRINT "   -c: Store the data in a CONST rather than DATA (suitable for small files)"
     PRINT "   -s: Disable compression and store the file instead"
     PRINT "   -o: Overwrite output file if it exists"
     PRINT
@@ -78,6 +78,7 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT " * Bulk convert files using wildcards"
     PRINT " * filespec can be a URL"
     PRINT " * If filespec.bi exists, then it will not be overwritten (unless -o is specified)"
+    PRINT " * Character per line may be changed in CONST mode due to QB64's 500 line continuation limit"
     PRINT
     PRINT "Usage:"
     PRINT " 1. Encode the binary file using Bin2Data"
@@ -196,6 +197,10 @@ END FUNCTION
 ' The file is then written as a QB64 header file
 SUB MakeResource (fileName AS STRING)
     CONST HEADER_FILE_EXTENSION = ".bi"
+    CONST STRING_CONCATENATION = " +"
+    CONST LINE_CONTINUATION = " _"
+    CONST DATA_STATEMENT = "DATA "
+    CONST LINE_CONTINUATION_MAX = 500
 
     DIM biFileName AS STRING
 
@@ -248,9 +253,9 @@ SUB MakeResource (fileName AS STRING)
         PRINT "done"
 
         IF shouldGenCONST THEN
-            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(TRUE) ' write if file is compressed
+            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + " " + STR$(TRUE) ' write if file is compressed
         ELSE
-            PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE)) ' write the DATA header
+            PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE)) ' write the DATA header
         END IF
 
         PRINT USING "Compressed###.##%"; 100 - 100! * LEN(compBuf) / ogSize
@@ -264,7 +269,7 @@ SUB MakeResource (fileName AS STRING)
         IF shouldGenCONST THEN
             PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(FALSE) ' write if file is compressed
         ELSE
-            PRINT #fh, "DATA "; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE)) ' write the DATA header
+            PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE)) ' write the DATA header
         END IF
 
         PRINT "Stored"
@@ -272,7 +277,13 @@ SUB MakeResource (fileName AS STRING)
         compBuf = EMPTY_STRING
     END IF
 
-    IF shouldGenCONST THEN PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME); ' write the name const without newline
+    IF shouldGenCONST THEN PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME) + LINE_CONTINUATION ' write the const name
+
+    ' Adjust character per line to work around QB64 limit if needed
+    IF LEN(buffer) \ dataCPL >= LINE_CONTINUATION_MAX - 2 THEN
+        dataCPL = LEN(buffer) \ (LINE_CONTINUATION_MAX - 2)
+        PRINT "Characters per data line auto-changed to"; dataCPL
+    END IF
 
     DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD dataCPL ' remainder
     DIM srcSizeMul AS _UNSIGNED LONG: srcSizeMul = LEN(buffer) - srcSizeRem ' exact multiple
@@ -281,7 +292,7 @@ SUB MakeResource (fileName AS STRING)
         IF shouldGenCONST THEN
             PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
         ELSE
-            PRINT #fh, "DATA "; ' start of line DATA statement
+            PRINT #fh, DATA_STATEMENT; ' start of line DATA statement
         END IF
 
         PRINT #fh, MID$(buffer, i, dataCPL); ' the actual data chunk
@@ -291,7 +302,7 @@ SUB MakeResource (fileName AS STRING)
 
             ' Now check if we need to write the line continuation combo for CONST string
             IF srcSizeRem > 0 OR i < srcSizeMul - dataCPL THEN
-                PRINT #fh, " + _" ' write a line continuation
+                PRINT #fh, STRING_CONCATENATION + LINE_CONTINUATION ' write a string concat op and then a line continuation
             ELSE
                 PRINT #fh, EMPTY_STRING ' move to the next line
             END IF
@@ -304,7 +315,7 @@ SUB MakeResource (fileName AS STRING)
         IF shouldGenCONST THEN
             PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
         ELSE
-            PRINT #fh, "DATA "; ' start of line DATA statement
+            PRINT #fh, DATA_STATEMENT; ' start of line DATA statement
         END IF
 
         PRINT #fh, MID$(buffer, i, dataCPL); ' the actual data chunk
@@ -315,6 +326,8 @@ SUB MakeResource (fileName AS STRING)
             PRINT #fh, EMPTY_STRING ' nothing special for DATA, simply move to the next line
         END IF
     END IF
+
+    PRINT #fh, EMPTY_STRING ' put a newline (required for CONST!)
 
     CLOSE fh
 

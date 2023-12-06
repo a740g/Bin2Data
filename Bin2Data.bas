@@ -28,8 +28,8 @@ $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,2,0,0
-$VERSIONINFO:PRODUCTVERSION#=2,2,0,0
+$VERSIONINFO:FILEVERSION#=2,2,1,0
+$VERSIONINFO:PRODUCTVERSION#=2,2,1,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -43,6 +43,8 @@ CONST IDENTIFIER_STYLE_DATA = 0
 CONST IDENTIFIER_STYLE_NAME = 1
 CONST IDENTIFIER_STYLE_SIZE = 2
 CONST IDENTIFIER_STYLE_COMP = 3
+CONST TYPE_SIGIL_BYTE = "%%"
+CONST TYPE_SIGIL_ULONG = "~&"
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -182,10 +184,10 @@ FUNCTION MakeLegalIdentifier$ (fileName AS STRING, fileSize AS UNSIGNED LONG, st
             MakeLegalIdentifier = CONST_KEYWORD + UCASE$(PREFIX_DATA + nameText) + ASSIGNMENT_STRING
 
         CASE IDENTIFIER_STYLE_SIZE
-            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_SIZE + UCASE$(nameText) + ASSIGNMENT_STRING
+            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_SIZE + UCASE$(nameText) + TYPE_SIGIL_ULONG + ASSIGNMENT_STRING
 
         CASE IDENTIFIER_STYLE_COMP
-            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_COMP + UCASE$(nameText) + ASSIGNMENT_STRING
+            MakeLegalIdentifier = CONST_KEYWORD + PREFIX_COMP + UCASE$(nameText) + TYPE_SIGIL_BYTE + ASSIGNMENT_STRING
 
         CASE ELSE ' IDENTIFIER_STYLE_DATA
             MakeLegalIdentifier = PREFIX_DATA + LCASE$(nameText) + LABEL_TERMINATOR
@@ -242,7 +244,7 @@ SUB MakeResource (fileName AS STRING)
     OPEN biFileName FOR OUTPUT AS fh
 
     IF shouldGenCONST THEN
-        PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_SIZE) + STR$(ogSize) ' write the size const
+        PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_SIZE) + STR$(ogSize) + TYPE_SIGIL_ULONG ' write the size const
     ELSE
         PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_DATA) ' write the label
     END IF
@@ -253,7 +255,7 @@ SUB MakeResource (fileName AS STRING)
         PRINT "done"
 
         IF shouldGenCONST THEN
-            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + " " + STR$(TRUE) ' write if file is compressed
+            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + " " + STR$(TRUE) + TYPE_SIGIL_BYTE ' write if file is compressed
         ELSE
             PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(TRUE)) ' write the DATA header
         END IF
@@ -267,7 +269,7 @@ SUB MakeResource (fileName AS STRING)
         PRINT "done"
 
         IF shouldGenCONST THEN
-            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(FALSE) ' write if file is compressed
+            PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_COMP) + STR$(FALSE) + TYPE_SIGIL_BYTE ' write if file is compressed
         ELSE
             PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(FALSE)) ' write the DATA header
         END IF

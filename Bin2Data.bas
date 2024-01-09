@@ -68,7 +68,7 @@ IF COMMANDCOUNT < 1 OR GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT "Copyright (c) 2023 Samuel Gomes"
     PRINT "https://github.com/a740g"
     PRINT
-    PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-s] [-o] [filespec]"
+    PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-c] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per line."; BASE64_CHARACTERS_PER_LINE_MIN; "-"; BASE64_CHARACTERS_PER_LINE_MAX; "(default"; STR$(dataCPL); ")"
     PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; UINTEGER_MAX; "(default 15)"
     PRINT "   -c: Store the data in a CONST rather than DATA (suitable for small files)"
@@ -203,6 +203,7 @@ SUB MakeResource (fileName AS STRING)
     CONST LINE_CONTINUATION = " _"
     CONST DATA_STATEMENT = "DATA "
     CONST LINE_CONTINUATION_MAX = 500
+    CONST CONST_INDENT_CHARS = 4
 
     DIM biFileName AS STRING
 
@@ -292,7 +293,7 @@ SUB MakeResource (fileName AS STRING)
 
     DIM i AS UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP dataCPL
         IF shouldGenCONST THEN
-            PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
+            PRINT #fh, SPACE$(CONST_INDENT_CHARS); CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
         ELSE
             PRINT #fh, DATA_STATEMENT; ' start of line DATA statement
         END IF
@@ -315,7 +316,7 @@ SUB MakeResource (fileName AS STRING)
 
     IF srcSizeRem > 0 THEN
         IF shouldGenCONST THEN
-            PRINT #fh, CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
+            PRINT #fh, SPACE$(CONST_INDENT_CHARS); CHR$(KEY_QUOTATION_MARK); ' opening quotation mark
         ELSE
             PRINT #fh, DATA_STATEMENT; ' start of line DATA statement
         END IF

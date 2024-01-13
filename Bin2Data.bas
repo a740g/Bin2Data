@@ -111,7 +111,7 @@ DIM argName AS INTEGER
 DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
 
 DO
-    argName = ToLowerCase(GetProgramArgument("wicso", argIndex))
+    argName = String_ToLowerCase(GetProgramArgument("wicso", argIndex))
 
     SELECT CASE argName
         CASE -1 ' ' no more arguments
@@ -263,7 +263,7 @@ SUB MakeResource (fileName AS STRING)
 
         PRINT USING "Compressed###.##%"; 100 - 100! * LEN(compBuf) / ogSize
 
-        compBuf = EMPTY_STRING
+        compBuf = STRING_EMPTY
     ELSE ' no goodness
         PRINT "Encoding data (this may take some time) ... ";
         buffer = Base64_Encode(buffer) ' we do not need the original buffer contents
@@ -277,7 +277,7 @@ SUB MakeResource (fileName AS STRING)
 
         PRINT "Stored"
 
-        compBuf = EMPTY_STRING
+        compBuf = STRING_EMPTY
     END IF
 
     IF shouldGenCONST THEN PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME) + LINE_CONTINUATION ' write the const name
@@ -307,10 +307,10 @@ SUB MakeResource (fileName AS STRING)
             IF srcSizeRem > 0 OR i < srcSizeMul - dataCPL THEN
                 PRINT #fh, STRING_CONCATENATION + LINE_CONTINUATION ' write a string concat op and then a line continuation
             ELSE
-                PRINT #fh, EMPTY_STRING ' move to the next line
+                PRINT #fh, STRING_EMPTY ' move to the next line
             END IF
         ELSE
-            PRINT #fh, EMPTY_STRING ' nothing special for DATA, simply move to the next line
+            PRINT #fh, STRING_EMPTY ' nothing special for DATA, simply move to the next line
         END IF
     NEXT i
 
@@ -326,11 +326,11 @@ SUB MakeResource (fileName AS STRING)
         IF shouldGenCONST THEN
             PRINT #fh, CHR$(KEY_QUOTATION_MARK) ' closing quotation mark
         ELSE
-            PRINT #fh, EMPTY_STRING ' nothing special for DATA, simply move to the next line
+            PRINT #fh, STRING_EMPTY ' nothing special for DATA, simply move to the next line
         END IF
     END IF
 
-    PRINT #fh, EMPTY_STRING ' put a newline (required for CONST!)
+    PRINT #fh, STRING_EMPTY ' put a newline (required for CONST!)
 
     CLOSE fh
 

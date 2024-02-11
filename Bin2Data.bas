@@ -280,12 +280,14 @@ SUB MakeResource (fileName AS STRING)
         compBuf = STRING_EMPTY
     END IF
 
-    IF shouldGenCONST THEN PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME) + LINE_CONTINUATION ' write the const name
+    IF shouldGenCONST THEN
+        PRINT #fh, MakeLegalIdentifier(GetFileNameFromPathOrURL$(fileName), ogSize, IDENTIFIER_STYLE_NAME) + LINE_CONTINUATION ' write the const name
 
-    ' Adjust character per line to work around QB64 limit if needed
-    IF LEN(buffer) \ dataCPL >= LINE_CONTINUATION_MAX - 2 THEN
-        dataCPL = LEN(buffer) \ (LINE_CONTINUATION_MAX - 2)
-        PRINT "Characters per data line auto-changed to"; dataCPL
+        ' Adjust character per line to work around QB64 limit if needed
+        IF LEN(buffer) \ dataCPL >= LINE_CONTINUATION_MAX - 2 THEN
+            dataCPL = LEN(buffer) \ (LINE_CONTINUATION_MAX - 2)
+            PRINT "Characters per data line auto-changed to"; dataCPL
+        END IF
     END IF
 
     DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD dataCPL ' remainder

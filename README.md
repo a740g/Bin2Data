@@ -67,6 +67,7 @@ FUNCTION Base64_LoadResourceData$
 * This requires the latest version of [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe)
 * When you clone a repository that contains submodules, the submodules are not automatically cloned by default
 * You will need to use the `git submodule update --init --recursive` to initialize, fetch and checkout git submodules
+* Get `Base64.bas` lite from [here](https://github.com/a740g/InForm-PE/blob/master/InForm/extensions/Base64.bas)
 
 ## ASSETS
 

@@ -71,6 +71,8 @@ REDIM qb64peKeyword(0 TO 0) AS STRING ' QB64-PE keywords array
 '-----------------------------------------------------------------------------------------------------------------------
 ' PROGRAM ENTRY POINT
 '-----------------------------------------------------------------------------------------------------------------------
+SetDefaultAppOptions
+
 ' Change to the directory specified by the environment
 CHDIR _STARTDIR$
 
@@ -124,8 +126,6 @@ IF _COMMANDCOUNT < 1 _ORELSE GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
 END IF
 
 PRINT
-
-SetDefaultAppOptions
 
 ' Convert all files requested
 DIM argName AS INTEGER

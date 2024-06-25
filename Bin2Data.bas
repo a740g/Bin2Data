@@ -495,9 +495,9 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     PRINT #f, STRING_EMPTY
     PRINT #f, "#include <stdint.h>"
     PRINT #f, STRING_EMPTY
-    PRINT #f, "SIZE_"; UCASE$(id); "()"; ogSize
-    PRINT #f, "COMP_"; UCASE$(id); "() "; LTRIM$(STR$(LEN(buffer) <> ogSize))
-    PRINT #f, "DATA_"; UCASE$(id); "() "; "((uintptr_t)(&"; id; "[0]))"
+    PRINT #f, "#define SIZE_"; UCASE$(id); "()"; ogSize
+    PRINT #f, "#define COMP_"; UCASE$(id); "() "; LTRIM$(STR$(LEN(buffer) <> ogSize))
+    PRINT #f, "#define DATA_"; UCASE$(id); "() "; "((uintptr_t)(&"; id; "[0]))"
     PRINT #f, STRING_EMPTY
     PRINT #f, "const uint8_t * " + id + "[] = {"
 
@@ -506,7 +506,7 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
         IF xPos = 1 THEN PRINT #f, SPACE$(INDENT_SPACES);
 
-        DIM char AS STRING: char = LTRIM$(STR$(ASC(buffer, i)))
+        DIM char AS STRING: char = String_FormatLong(ASC(buffer, i), "0x%x")
         PRINT #f, char;
 
         IF i < LEN(buffer) THEN PRINT #f, ",";

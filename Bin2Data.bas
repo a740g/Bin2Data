@@ -499,14 +499,14 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     PRINT #f, "#define COMP_"; UCASE$(id); "() "; LTRIM$(STR$(LEN(buffer) <> ogSize))
     PRINT #f, "#define DATA_"; UCASE$(id); "() "; "((uintptr_t)(&"; id; "[0]))"
     PRINT #f, STRING_EMPTY
-    PRINT #f, "const uint8_t * " + id + "[] = {"
+    PRINT #f, "const uint8_t " + id + "[] = {"
 
     DIM xPos AS _UNSIGNED LONG: xPos = 1
 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
         IF xPos = 1 THEN PRINT #f, SPACE$(INDENT_SPACES);
 
-        DIM char AS STRING: char = String_FormatLong(ASC(buffer, i), "0x%x")
+        DIM char AS STRING: char = LTRIM$(STR$(ASC(buffer, i)))
         PRINT #f, char;
 
         IF i < LEN(buffer) THEN PRINT #f, ",";

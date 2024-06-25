@@ -506,11 +506,12 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
         IF xPos = 1 THEN PRINT #f, SPACE$(INDENT_SPACES);
 
-        PRINT #f, String_FormatLong(ASC(buffer, i), "%03d");
+        DIM char AS STRING: char = LTRIM$(STR$(ASC(buffer, i)))
+        PRINT #f, char;
 
         IF i < LEN(buffer) THEN PRINT #f, ",";
 
-        xPos = xPos + 4 ' 3 digits + comma
+        xPos = xPos + LEN(char) + 1 ' +1 for comma
 
         IF xPos >= appOption.charPerLine THEN
             IF i < LEN(buffer) THEN PRINT #f, STRING_EMPTY

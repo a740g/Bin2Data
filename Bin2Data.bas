@@ -52,7 +52,7 @@ CONST ID_NAME_LENGTH_MAX = 40
 '-----------------------------------------------------------------------------------------------------------------------
 ' TYPES
 '-----------------------------------------------------------------------------------------------------------------------
-TYPE AppOtionType
+TYPE AppOptionType
     mode AS _UNSIGNED _BYTE ' see GENERATE_* CONSTs above
     charPerLine AS _UNSIGNED LONG ' characters / line
     compLevel AS _UNSIGNED INTEGER ' compression level
@@ -64,7 +64,7 @@ END TYPE
 '-----------------------------------------------------------------------------------------------------------------------
 ' GLOBAL VARIABLES
 '-----------------------------------------------------------------------------------------------------------------------
-DIM SHARED appOption AS AppOtionType ' global options
+DIM SHARED appOption AS AppOptionType ' global options
 REDIM qb64peKeyword(0 TO 0) AS STRING ' QB64-PE keywords array
 '-----------------------------------------------------------------------------------------------------------------------
 

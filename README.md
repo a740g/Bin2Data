@@ -8,9 +8,11 @@ With this library, you can easily store binary data within your QB64 programs, m
 
 ## FEATURES
 
-* Encode binary files to Base64 encoded DATA statements.
+* Encode binary files to Base64 encoded DATA or CONST statements.
+* Export compressed binary files to C arrays or raw file dumps.
 * Decode Base64 encoded data back into binary form.
 * Simple API that makes it easy to use.
+* Easy sharing of code and data in forums.
 
 ## USAGE
 
@@ -18,7 +20,7 @@ With this library, you can easily store binary data within your QB64 programs, m
 * Open Terminal and change to the directory using an appropriate OS command
 * Run `git submodule update --init --recursive` to initialize, fetch and checkout git submodules
 * Open *Bin2Data.bas* in the QB64-PE IDE and press `F5` to compile and run
-* To use the library in your project add the [Toolbox64](https://github.com/a740g/Toolbox64) repositiory as a [Git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
+* To use the library in your project add the [Toolbox64](https://github.com/a740g/Toolbox64) repository as a [Git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
 * Then, simply include the library files in your QB64 program and call the relevant functions to perform encoding and decoding operations.
 
 Assuming the a file has been encoded using Bin2Data, here's an example of how you can use the library to to decode Base64 encoded data.

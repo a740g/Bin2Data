@@ -7,8 +7,8 @@
 ' HEADER FILES
 '-----------------------------------------------------------------------------------------------------------------------
 '$INCLUDE:'include/StringOps.bi'
-'$INCLUDE:'include/MathOps.bi'
-'$INCLUDE:'include/FileOps.bi'
+'$INCLUDE:'include/Math/Math.bi'
+'$INCLUDE:'include/Pathname.bi'
 '$INCLUDE:'include/Base64.bi'
 '$INCLUDE:'include/Deflate.bi'
 '-----------------------------------------------------------------------------------------------------------------------
@@ -208,8 +208,8 @@ SUB MakeResource (fileName AS STRING)
     ' Get the base file name that we'll use to prefix before the generated extension
     DIM outputFileName AS STRING
 
-    IF LEN(GetDriveOrSchemeFromPathOrURL(fileName)) > 2 THEN
-        outputFileName = GetLegalFileName(GetFileNameFromPathOrURL(fileName))
+    IF LEN(Pathname_GetDriveOrScheme(fileName)) > 2 THEN
+        outputFileName = Pathname_MakeLegalFileName(Pathname_GetFileName(fileName))
     ELSE
         outputFileName = fileName
     END IF
@@ -386,7 +386,7 @@ END FUNCTION
 FUNCTION MakeIdentifier$ (fileName AS STRING, size AS _UNSIGNED LONG)
     DIM sizeText AS STRING: sizeText = LTRIM$(STR$(size))
     DIM i AS _UNSIGNED LONG: i = ID_NAME_LENGTH_MAX - LEN(sizeText) - 6 ' ID_NAME_LENGTH_MAX - text size of file size - len("data_" + "_")
-    DIM nameText AS STRING: nameText = MakeQB64LegalId(GetFileNameFromPathOrURL(fileName))
+    DIM nameText AS STRING: nameText = MakeQB64LegalId(Pathname_GetFileName(fileName))
     IF LEN(nameText) > i THEN nameText = LEFT$(nameText, i) ' chop the name if everything is adding up to be more than LABEL_LENGTH_MAX chars
     MakeIdentifier = nameText + "_" + sizeText
 END FUNCTION
@@ -531,7 +531,7 @@ END SUB
 '-----------------------------------------------------------------------------------------------------------------------
 '$INCLUDE:'include/ProgramArgs.bas'
 '$INCLUDE:'include/StringOps.bas'
-'$INCLUDE:'include/FileOps.bas'
+'$INCLUDE:'include/Pathname.bas'
 '$INCLUDE:'include/Base64.bas'
 '$INCLUDE:'include/Deflate.bas'
 '-----------------------------------------------------------------------------------------------------------------------

@@ -27,15 +27,15 @@ $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,3,1,0
-$VERSIONINFO:PRODUCTVERSION#=2,3,1,0
+$VERSIONINFO:FILEVERSION#=2,3,2,0
+$VERSIONINFO:PRODUCTVERSION#=2,3,2,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' CONSTANTS
 '-----------------------------------------------------------------------------------------------------------------------
-CONST BASE64_CHAR_PER_LINE_MIN = SIZE_OF_BYTE
-CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * SIZE_OF_LONG
+CONST BASE64_CHAR_PER_LINE_MIN = _SIZE_OF_BYTE
+CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_MAX = 4096
 CONST COMP_LEVEL = 0 ' whatever is the default for the library
 CONST INDENT_SPACES = 4
@@ -85,7 +85,7 @@ IF _COMMANDCOUNT < 1 _ORELSE GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per data line."; BASE64_CHAR_PER_LINE_MIN; "-"; BASE64_CHAR_PER_LINE_MAX; "(default"; STR$(appOption.charPerLine); ")"
-    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; UINTEGER_MAX; "(default 15)"
+    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; _UINTEGER_MAX; "(default 15)"
     PRINT "   -d: Generate DATA (.bas; default)"
     PRINT "   -c: Generate a CONST (.bas; suitable for small files)"
     PRINT "   -p: Generate a C array (.h)"
@@ -145,7 +145,7 @@ DO
 
         CASE KEY_LOWER_I
             argIndex = argIndex + 1 ' value at next index
-            appOption.compLevel = Math_ClampLong(VAL(COMMAND$(argIndex)), 1, UINTEGER_MAX)
+            appOption.compLevel = Math_ClampLong(VAL(COMMAND$(argIndex)), 1, _UINTEGER_MAX)
             PRINT "Compression level set to"; appOption.compLevel
 
         CASE KEY_LOWER_D
@@ -165,21 +165,21 @@ DO
             PRINT "Raw dump enabled"
 
             IF appOption.store THEN
-                appOption.store = FALSE
+                appOption.store = _FALSE
                 PRINT "Store mode disabled"
             END IF
 
         CASE KEY_LOWER_S
             IF appOption.mode = GENERATE_RAW THEN
-                appOption.store = FALSE
+                appOption.store = _FALSE
                 PRINT "Cannot enable store mode when raw dump is enabled"
             ELSE
-                appOption.store = TRUE
+                appOption.store = _TRUE
                 PRINT "Store mode enabled"
             END IF
 
         CASE KEY_LOWER_O
-            appOption.overwrite = TRUE
+            appOption.overwrite = _TRUE
             PRINT "Overwrite mode enabled"
 
         CASE ELSE ' probably a file name
@@ -199,8 +199,8 @@ SUB SetDefaultAppOptions
     appOption.mode = GENERATE_DATA
     appOption.charPerLine = BASE64_CHAR_PER_LINE_DEFAULT
     appOption.compLevel = COMP_LEVEL
-    appOption.overwrite = FALSE ' do not overwrite
-    appOption.store = FALSE ' do not just store
+    appOption.overwrite = _FALSE ' do not overwrite
+    appOption.store = _FALSE ' do not just store
 END SUB
 
 
@@ -260,7 +260,7 @@ SUB MakeResource (fileName AS STRING)
                 PRINT "Compressed file size is more than the original size!"
                 EXIT SUB
             ELSE
-                appOption.store = TRUE ' switch to store mode
+                appOption.store = _TRUE ' switch to store mode
             END IF
         END IF
     END IF
@@ -307,8 +307,8 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
 
     ' Load the keyword table if it was not loaded
     IF LEN(qb64peKeyword(0)) = 0 THEN
-        IF String_Tokenize(QB64PE_KEYWORDS, "@", STRING_EMPTY, FALSE, qb64peKeyword()) < 1 THEN
-            ERROR ERROR_INTERNAL_ERROR
+        IF String_Tokenize(QB64PE_KEYWORDS, "@", _STR_EMPTY, _FALSE, qb64peKeyword()) < 1 THEN
+            ERROR _ERR_INTERNAL_ERROR
         END IF
     END IF
 
@@ -316,14 +316,14 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
     DIM i AS LONG: FOR i = 0 TO UBOUND(qb64peKeyword)
         ' Simple compare
         IF text = qb64peKeyword(i) THEN
-            IsQB64Keyword = TRUE
+            IsQB64Keyword = _TRUE
             EXIT FUNCTION
         END IF
 
         ' Compare without leading `_` for $NOPREFIX cases
         IF ASC(qb64peKeyword(i), 1) = KEY_UNDERSCORE THEN
             IF RIGHT$(qb64peKeyword(i), LEN(qb64peKeyword(i)) - 1) = text THEN
-                IsQB64Keyword = TRUE
+                IsQB64Keyword = _TRUE
                 EXIT FUNCTION
             END IF
         END IF
@@ -345,7 +345,7 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
                 IF NOT startingLegal THEN ASC(text, i) = ASC(ID_CONFLICT_RESOLUTION_CHAR)
 
             CASE KEY_UPPER_A TO KEY_UPPER_Z, KEY_LOWER_A TO KEY_LOWER_Z
-                startingLegal = TRUE
+                startingLegal = _TRUE
 
             CASE KEY_UNDERSCORE
                 ' NOP
@@ -400,7 +400,7 @@ SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LO
     OPEN outputfileName FOR OUTPUT AS fh
 
     PRINT #fh, "$INCLUDEONCE"
-    PRINT #fh, STRING_EMPTY
+    PRINT #fh, _STR_EMPTY
 
     ' Write the DATA lable
     PRINT #fh, "data_"; MakeIdentifier(outputfileName, ogSize); ":"
@@ -442,7 +442,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     DIM id AS STRING: id = UCASE$(MakeIdentifier(outputfileName, ogSize))
 
     PRINT #fh, "$INCLUDEONCE"
-    PRINT #fh, STRING_EMPTY
+    PRINT #fh, _STR_EMPTY
 
     PRINT #fh, CONST_KEYWORD; "SIZE_"; id; ASSIGNMENT_STRING; STR$(ogSize) + "~&" ' write the size const
     PRINT #fh, CONST_KEYWORD; "COMP_"; id; ASSIGNMENT_STRING; LTRIM$(STR$(LEN(buffer) <> ogSize)); "%%" ' write if file is compressed
@@ -469,7 +469,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
         IF srcSizeRem > 0 OR i < srcSizeMul - appOption.charPerLine THEN
             PRINT #fh, " +"; LINE_CONTINUATION ' write a string concat op and then a line continuation
         ELSE
-            PRINT #fh, STRING_EMPTY ' move to the next line
+            PRINT #fh, _STR_EMPTY ' move to the next line
         END IF
     NEXT i
 
@@ -477,7 +477,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
         PRINT #fh, SPACE$(INDENT_SPACES); CHR$(KEY_QUOTATION_MARK); MID$(buffer, i, appOption.charPerLine); CHR$(KEY_QUOTATION_MARK)
     END IF
 
-    PRINT #fh, STRING_EMPTY ' put a newline (required for CONST!)
+    PRINT #fh, _STR_EMPTY ' put a newline (required for CONST!)
 
     CLOSE fh
 
@@ -492,13 +492,13 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     DIM id AS STRING: id = MakeIdentifier(outputfileName, ogSize)
 
     PRINT #f, "#pragma once"
-    PRINT #f, STRING_EMPTY
+    PRINT #f, _STR_EMPTY
     PRINT #f, "#include <stdint.h>"
-    PRINT #f, STRING_EMPTY
+    PRINT #f, _STR_EMPTY
     PRINT #f, "#define SIZE_"; UCASE$(id); "()"; ogSize
     PRINT #f, "#define COMP_"; UCASE$(id); "() "; LTRIM$(STR$(LEN(buffer) <> ogSize))
     PRINT #f, "#define DATA_"; UCASE$(id); "() "; "((uintptr_t)(&"; id; "[0]))"
-    PRINT #f, STRING_EMPTY
+    PRINT #f, _STR_EMPTY
     PRINT #f, "const uint8_t " + id + "[] = {"
 
     DIM xPos AS _UNSIGNED LONG: xPos = 1
@@ -514,12 +514,12 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
         xPos = xPos + LEN(char) + 1 ' +1 for comma
 
         IF xPos >= appOption.charPerLine THEN
-            IF i < LEN(buffer) THEN PRINT #f, STRING_EMPTY
+            IF i < LEN(buffer) THEN PRINT #f, _STR_EMPTY
             xPos = 1
         END IF
     NEXT i
 
-    PRINT #f, STRING_EMPTY
+    PRINT #f, _STR_EMPTY
     PRINT #f, "};"
 
     CLOSE #f

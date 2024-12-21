@@ -9,8 +9,6 @@
 '$INCLUDE:'include/StringOps.bi'
 '$INCLUDE:'include/Math/Math.bi'
 '$INCLUDE:'include/Pathname.bi'
-'$INCLUDE:'include/Base64.bi'
-'$INCLUDE:'include/Deflate.bi'
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -37,7 +35,9 @@ $VERSIONINFO:PRODUCTVERSION#=2,3,2,0
 CONST BASE64_CHAR_PER_LINE_MIN = _SIZE_OF_BYTE
 CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_MAX = 4096
-CONST COMP_LEVEL = 0 ' whatever is the default for the library
+CONST COMP_LEVEL_MIN = 1
+CONST COMP_LEVEL_MAX = 10
+CONST COMP_LEVEL_DEFAULT = 0 ' whatever is the default for the library
 CONST INDENT_SPACES = 4
 CONST GENERATE_DATA = 0 ' BASIC DATA
 CONST GENERATE_CONST = 1 ' BASIC CONST
@@ -55,7 +55,7 @@ CONST ID_NAME_LENGTH_MAX = 40
 TYPE AppOptionType
     mode AS _UNSIGNED _BYTE ' see GENERATE_* CONSTs above
     charPerLine AS _UNSIGNED LONG ' characters / line
-    compLevel AS _UNSIGNED INTEGER ' compression level
+    compLevel AS _UNSIGNED _BYTE ' compression level
     overwrite AS _BYTE ' overwrite output?
     store AS _BYTE ' bypass compression?
 END TYPE
@@ -85,7 +85,7 @@ IF _COMMANDCOUNT < 1 _ORELSE GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per data line."; BASE64_CHAR_PER_LINE_MIN; "-"; BASE64_CHAR_PER_LINE_MAX; "(default"; STR$(appOption.charPerLine); ")"
-    PRINT "   -i: A number specifying the compression level (anything more than 15 will be too slow). 1 -"; _UINTEGER_MAX; "(default 15)"
+    PRINT "   -i: A number specifying the compression level."; COMP_LEVEL_MIN; "-"; COMP_LEVEL_MAX
     PRINT "   -d: Generate DATA (.bas; default)"
     PRINT "   -c: Generate a CONST (.bas; suitable for small files)"
     PRINT "   -p: Generate a C array (.h)"
@@ -145,7 +145,7 @@ DO
 
         CASE KEY_LOWER_I
             argIndex = argIndex + 1 ' value at next index
-            appOption.compLevel = Math_ClampLong(VAL(COMMAND$(argIndex)), 1, _UINTEGER_MAX)
+            appOption.compLevel = Math_ClampLong(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
             PRINT "Compression level set to"; appOption.compLevel
 
         CASE KEY_LOWER_D
@@ -198,7 +198,7 @@ SYSTEM
 SUB SetDefaultAppOptions
     appOption.mode = GENERATE_DATA
     appOption.charPerLine = BASE64_CHAR_PER_LINE_DEFAULT
-    appOption.compLevel = COMP_LEVEL
+    appOption.compLevel = COMP_LEVEL_DEFAULT
     appOption.overwrite = _FALSE ' do not overwrite
     appOption.store = _FALSE ' do not just store
 END SUB
@@ -249,7 +249,12 @@ SUB MakeResource (fileName AS STRING)
         PRINT "Stored"
     ELSE
         PRINT "Compressing data (this may take some time) ... ";
-        DIM compBuf AS STRING: compBuf = DeflatePro(buffer, appOption.compLevel)
+        DIM compBuf AS STRING
+        IF appOption.compLevel THEN
+            compBuf = _DEFLATE$(buffer, appOption.compLevel)
+        ELSE
+            compBuf = _DEFLATE$(buffer)
+        END IF
         PRINT "done"
 
         IF LEN(compBuf) < LEN(buffer) THEN
@@ -406,7 +411,7 @@ SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LO
     PRINT #fh, "data_"; MakeIdentifier(outputfileName, ogSize); ":"
 
     PRINT "Encoding data (this may take some time) ... ";
-    buffer = Base64_Encode(buffer) ' we do not need the original buffer contents
+    buffer = _BASE64ENCODE$(buffer) ' we do not need the original buffer contents
     PRINT "done"
 
     ' Write the DATA header
@@ -448,7 +453,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     PRINT #fh, CONST_KEYWORD; "COMP_"; id; ASSIGNMENT_STRING; LTRIM$(STR$(LEN(buffer) <> ogSize)); "%%" ' write if file is compressed
 
     PRINT "Encoding data (this may take some time) ... ";
-    buffer = Base64_Encode(buffer) ' we do not need the original buffer contents
+    buffer = _BASE64ENCODE$(buffer) ' we do not need the original buffer contents
     PRINT "done"
 
     PRINT #fh, CONST_KEYWORD; "DATA_"; id; ASSIGNMENT_STRING; LINE_CONTINUATION ' write the const name
@@ -533,6 +538,5 @@ END SUB
 '$INCLUDE:'include/StringOps.bas'
 '$INCLUDE:'include/Pathname.bas'
 '$INCLUDE:'include/Base64.bas'
-'$INCLUDE:'include/Deflate.bas'
 '-----------------------------------------------------------------------------------------------------------------------
 '-----------------------------------------------------------------------------------------------------------------------

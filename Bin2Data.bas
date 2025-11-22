@@ -1,14 +1,15 @@
 '-----------------------------------------------------------------------------------------------------------------------
 ' QB64-PE Binary to DATA converter
-' Copyright (c) 2024 Samuel Gomes
+' Copyright (c) 2025 Samuel Gomes
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' HEADER FILES
 '-----------------------------------------------------------------------------------------------------------------------
+$LET TOOLBOX64_STRICT = TRUE
+
 '$INCLUDE:'include/StringOps.bi'
-'$INCLUDE:'include/Math/Math.bi'
-'$INCLUDE:'include/Pathname.bi'
+'$INCLUDE:'include/FS/Pathname.bi'
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -18,23 +19,23 @@ $CONSOLE:ONLY
 $EXEICON:'./Bin2Data.ico'
 $VERSIONINFO:ProductName='Bin2Data'
 $VERSIONINFO:CompanyName='Samuel Gomes'
-$VERSIONINFO:LegalCopyright='Copyright (c) 2024 Samuel Gomes'
+$VERSIONINFO:LegalCopyright='Copyright (c) 2025 Samuel Gomes'
 $VERSIONINFO:LegalTrademarks='All trademarks are property of their respective owners'
 $VERSIONINFO:Web='https://github.com/a740g'
 $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,3,2,0
-$VERSIONINFO:PRODUCTVERSION#=2,3,2,0
+$VERSIONINFO:FILEVERSION#=2,3,3,0
+$VERSIONINFO:PRODUCTVERSION#=2,3,3,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
 ' CONSTANTS
 '-----------------------------------------------------------------------------------------------------------------------
-CONST BASE64_CHAR_PER_LINE_MIN = _SIZE_OF_BYTE
+CONST BASE64_CHAR_PER_LINE_MIN = 2 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * _SIZE_OF_LONG
-CONST BASE64_CHAR_PER_LINE_MAX = 4096
+CONST BASE64_CHAR_PER_LINE_MAX = 1024 * _SIZE_OF_LONG
 CONST COMP_LEVEL_MIN = 1
 CONST COMP_LEVEL_MAX = 10
 CONST COMP_LEVEL_DEFAULT = 0 ' whatever is the default for the library
@@ -46,7 +47,7 @@ CONST GENERATE_RAW = 3 ' raw file dump (only if file is compressed)
 CONST FILE_EXT_BI = ".bi"
 CONST FILE_EXT_H = ".h"
 CONST FILE_EXT_DEFLATE = ".deflate"
-CONST ID_NAME_LENGTH_MAX = 40
+CONST ID_NAME_LENGTH_MAX = 40 ' QB64 indentifiers must be <= 40 chars :(
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -69,7 +70,7 @@ REDIM qb64peKeyword(0 TO 0) AS STRING ' QB64-PE keywords array
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
-' PROGRAM ENTRY POINT
+' MAIN
 '-----------------------------------------------------------------------------------------------------------------------
 SetDefaultAppOptions
 
@@ -77,10 +78,10 @@ SetDefaultAppOptions
 CHDIR _STARTDIR$
 
 ' If there are no command line parameters just show some info and exit
-IF _COMMANDCOUNT < 1 _ORELSE GetProgramArgumentIndex(KEY_QUESTION_MARK) > 0 THEN
+IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
     COLOR 7
     PRINT "Bin2Data: Converts binary files to QB64-PE data"
-    PRINT "Copyright (c) 2024 Samuel Gomes"
+    PRINT "Copyright (c) 2025 Samuel Gomes"
     PRINT "https://github.com/a740g"
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
@@ -128,39 +129,39 @@ END IF
 PRINT
 
 ' Convert all files requested
-DIM argName AS INTEGER
+DIM argName AS STRING
 DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
 
 DO
-    argName = String_ToLowerCase(GetProgramArgument("widcprso", argIndex))
+    argName = Args_GetArgumentName("w|width|i|d|data|c|const|p|r|raw|s|store|o|overwrite", argIndex)
 
     SELECT CASE argName
-        CASE -1 ' ' no more arguments
+        CASE _STR_EMPTY ' no more arguments
             EXIT DO
 
-        CASE KEY_LOWER_W
+        CASE "w", "width"
             argIndex = argIndex + 1 ' value at next index
-            appOption.charPerLine = Math_ClampLong(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
+            appOption.charPerLine = _CLAMP(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
             PRINT "Characters per data line set to"; appOption.charPerLine
 
-        CASE KEY_LOWER_I
+        CASE "i"
             argIndex = argIndex + 1 ' value at next index
-            appOption.compLevel = Math_ClampLong(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
+            appOption.compLevel = _CLAMP(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
             PRINT "Compression level set to"; appOption.compLevel
 
-        CASE KEY_LOWER_D
+        CASE "d", "data"
             appOption.mode = GENERATE_DATA
             PRINT "DATA generation enabled"
 
-        CASE KEY_LOWER_C
+        CASE "c", "const"
             appOption.mode = GENERATE_CONST
             PRINT "CONST generation enabled"
 
-        CASE KEY_LOWER_P
+        CASE "p"
             appOption.mode = GENERATE_CARR
             PRINT "C array generation enabled"
 
-        CASE KEY_LOWER_R
+        CASE "r", "raw"
             appOption.mode = GENERATE_RAW
             PRINT "Raw dump enabled"
 
@@ -169,7 +170,7 @@ DO
                 PRINT "Store mode disabled"
             END IF
 
-        CASE KEY_LOWER_S
+        CASE "s", "store"
             IF appOption.mode = GENERATE_RAW THEN
                 appOption.store = _FALSE
                 PRINT "Cannot enable store mode when raw dump is enabled"
@@ -178,16 +179,16 @@ DO
                 PRINT "Store mode enabled"
             END IF
 
-        CASE KEY_LOWER_O
+        CASE "o", "overwrite"
             appOption.overwrite = _TRUE
             PRINT "Overwrite mode enabled"
 
         CASE ELSE ' probably a file name
-            MakeResource COMMAND$(argIndex)
+            MakeResource argName
     END SELECT
 
     argIndex = argIndex + 1 ' move to the next index
-LOOP UNTIL argName = -1
+LOOP WHILE LEN(argName)
 
 SYSTEM
 '-----------------------------------------------------------------------------------------------------------------------
@@ -209,7 +210,7 @@ SUB MakeResource (fileName AS STRING)
     DIM outputFileName AS STRING
 
     IF LEN(Pathname_GetDriveOrScheme(fileName)) > 2 THEN
-        outputFileName = Pathname_MakeLegalFileName(Pathname_GetFileName(fileName))
+        outputFileName = Pathname_Sanitize(Pathname_GetFileName(fileName))
     ELSE
         outputFileName = fileName
     END IF
@@ -380,7 +381,7 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
         END IF
 
         ' Compare without leading `_` for $NOPREFIX cases
-        IF ASC(qb64peKeyword(i), 1) = KEY_UNDERSCORE THEN
+        IF ASC(qb64peKeyword(i), 1) = _ASC_UNDERSCORE THEN
             IF RIGHT$(qb64peKeyword(i), LEN(qb64peKeyword(i)) - 1) = text THEN
                 IsQB64Keyword = _TRUE
                 EXIT FUNCTION
@@ -400,30 +401,30 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(text)
         SELECT CASE ASC(text, i)
-            CASE KEY_0 TO KEY_9
+            CASE ASC_0 TO ASC_9
                 IF NOT startingLegal THEN ASC(text, i) = ASC(ID_CONFLICT_RESOLUTION_CHAR)
 
-            CASE KEY_UPPER_A TO KEY_UPPER_Z, KEY_LOWER_A TO KEY_LOWER_Z
+            CASE ASC_UPPER_A TO ASC_UPPER_Z, ASC_LOWER_A TO ASC_LOWER_Z
                 startingLegal = _TRUE
 
-            CASE KEY_UNDERSCORE
+            CASE _ASC_UNDERSCORE
                 ' NOP
 
             CASE ELSE
-                ASC(text, i) = KEY_UNDERSCORE ' replace with underscore
+                ASC(text, i) = _ASC_UNDERSCORE ' replace with underscore
         END SELECT
     NEXT
 
     ' Check if the identifier begins with a single underscore
-    IF ASC(text, 1) = KEY_UNDERSCORE THEN
+    IF ASC(text, 1) = _ASC_UNDERSCORE THEN
         ' Check if there's only one underscore at the beginning
-        IF LEN(text) > 1 AND ASC(text, 2) <> KEY_UNDERSCORE THEN
+        IF LEN(text) > 1 AND ASC(text, 2) <> _ASC_UNDERSCORE THEN
             text = "_" + text ' add another underscore to make it legal
         END IF
     END IF
 
     ' Check if the identifier ends with an underscore
-    WHILE ASC(text, LEN(text)) = KEY_UNDERSCORE
+    WHILE ASC(text, LEN(text)) = _ASC_UNDERSCORE
         text = LEFT$(text, LEN(text) - 1) ' remove trailing underscore
     WEND
 
@@ -492,7 +493,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     CONST CONST_KEYWORD = "CONST "
     CONST ASSIGNMENT_STRING = " ="
     CONST LINE_CONTINUATION = " _"
-    CONST LINE_CONTINUATION_MAX = 500
+    CONST LINE_CONTINUATION_MAX = 499
 
     ' Open the output file
     DIM fh AS LONG: fh = FREEFILE
@@ -522,7 +523,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     DIM srcSizeMul AS _UNSIGNED LONG: srcSizeMul = LEN(buffer) - srcSizeRem ' exact multiple
 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP appOption.charPerLine
-        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(KEY_QUOTATION_MARK); MID$(buffer, i, appOption.charPerLine); CHR$(KEY_QUOTATION_MARK);
+        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, appOption.charPerLine); CHR$(_ASC_QUOTE);
 
         ' Now check if we need to write the line continuation combo for CONST string
         IF srcSizeRem > 0 OR i < srcSizeMul - appOption.charPerLine THEN
@@ -533,7 +534,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     NEXT i
 
     IF srcSizeRem > 0 THEN
-        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(KEY_QUOTATION_MARK); MID$(buffer, i, appOption.charPerLine); CHR$(KEY_QUOTATION_MARK)
+        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, appOption.charPerLine); CHR$(_ASC_QUOTE)
     END IF
 
     PRINT #fh, _STR_EMPTY ' put a newline (required for CONST!)
@@ -588,9 +589,8 @@ END SUB
 '-----------------------------------------------------------------------------------------------------------------------
 ' MODULE FILES
 '-----------------------------------------------------------------------------------------------------------------------
-'$INCLUDE:'include/ProgramArgs.bas'
+'$INCLUDE:'include/CLI/Args.bas'
 '$INCLUDE:'include/StringOps.bas'
-'$INCLUDE:'include/Pathname.bas'
-'$INCLUDE:'include/Base64.bas'
+'$INCLUDE:'include/FS/Pathname.bas'
 '-----------------------------------------------------------------------------------------------------------------------
 '-----------------------------------------------------------------------------------------------------------------------

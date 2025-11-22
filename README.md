@@ -1,76 +1,170 @@
-# BIN2DATA
+# Bin2Data
 
-Bin2Data and it's companion library is written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that allows for the conversion of binary files to Base64 encoded [DATA](https://qb64phoenix.com/qb64wiki/index.php/DATA) statements. This library not only encodes binary data into Base64, but also allows for the decoding of Base64 encoded data back into its binary form. The data is optionally compressed using Google's [Zopfli](https://github.com/google/zopfli) compression library if it sees any goodness. This means that files that are already compressed, may not go through one more compression and decompression step. The compressed data is compatible with QB64-PE's [_DEFLATE$](https://qb64phoenix.com/qb64wiki/index.php/DEFLATE$).
+`Bin2Data` is a command-line utility, written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that converts binary files into source code, making it easy to embed resources directly into your executables. It can also optionally compress the data.
 
 ![Screenshot](screenshot.png)
 
-With this library, you can easily store binary data within your QB64 programs, making it easier to distribute and maintain the files required for your program to run. The library provides a simple API that you can use to perform encoding and decoding operations with just a few lines of code.
+## Features
 
-## FEATURES
+* Converts binary files into embeddable source code formats.
+* Supports multiple output formats:
+  * QB64-PE `DATA` statements (`.bi` file).
+  * QB64-PE `CONST` string (`.bi` file).
+  * C-style header with a `uint8_t` array (`.h` file).
+* Can also output a raw zlib/deflate compressed file (`.deflate`).
+* Optionally compresses data using QB64-PE's `_DEFLATE$` function.
+* Base64 encoding for QB64-PE `DATA` and `CONST` formats.
+* Command-line interface with support for wildcards for batch processing.
 
-* Encode binary files to Base64 encoded DATA or CONST statements.
-* Export compressed binary files to C arrays or raw file dumps.
-* Decode Base64 encoded data back into binary form.
-* Simple API that makes it easy to use.
-* Easy sharing of code and data in forums.
+## Building and Using Bin2Data
 
-## USAGE
+### 1. Build from source
 
-* Clone the repository to a directory of your choice
-* Open Terminal and change to the directory using an appropriate OS command
-* Run `git submodule update --init --recursive` to initialize, fetch and checkout git submodules
-* Open *Bin2Data.bas* in the QB64-PE IDE and press `F5` to compile and run
-* To use the library in your project add the [Toolbox64](https://github.com/a740g/Toolbox64) repository as a [Git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
-* Then, simply include the library files in your QB64 program and call the relevant functions to perform encoding and decoding operations.
+1. Clone this repository: `git clone https://github.com/a740g/Bin2Data.git`
+2. Change into the directory: `cd Bin2Data`
+3. Initialize and update the submodules: `git submodule update --init --recursive`
+4. Open `Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
 
-Assuming the a file has been encoded using Bin2Data, here's an example of how you can use the library to to decode Base64 encoded data.
+### 2. Command-Line Usage
+
+You can run `Bin2Data` from your terminal. The help screen shows the available options.
+
+```text
+Bin2Data: Converts binary files to QB64-PE data
+Copyright (c) 2025 Samuel Gomes
+https://github.com/a740g
+
+Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]
+   -w: A number specifying the number of characters per data line. 8-4096 (default 112)
+   -i: A number specifying the compression level. 1-10
+   -d: Generate DATA (.bas; default)
+   -c: Generate a CONST (.bas; suitable for small files)
+   -p: Generate a C array (.h)
+   -r: Dump the raw compressed file (.deflate)
+   -s: Disable compression and store the file instead
+   -o: Overwrite output file if it exists
+
+Note:
+ * Will create filespec.bi/.h/.deflate (based on the switches)
+ * Can bulk convert files using wildcards
+ * filespec can be a URL
+ * If filespec.bi/.h/.deflate exists, then it will not be overwritten (unless -o is specified)
+ * Character per line may be changed in CONST mode due to QB64's 500 line continuation limit
+ * C output is barebones. Use sizeof to get the array size
+```
+
+## Using the Generated Files
+
+### QB64-PE Projects
+
+For QB64-PE, you need `Base64.bas` from the [Toolbox64](https://github.com/a740g/Toolbox64) library.
+
+#### Example: Using DATA statements (`-d` switch)
+
+This is the default mode. It creates a `.bi` file containing a `RESTORE` label and `DATA` statements.
+
+1. Generate the file: `Bin2Data my_asset.png`
+    This will create `my_asset.png.bi`.
+
+2. In your main QB64-PE program:
 
 ```vb
-' In this example we used Bin2Data on my_music.mp3 and it created a file called my_music.mp3.bi
-' It assumes that you have cloned the Toolbox64 repo in the include subdirectory under your project directory
+' Your program logic here
+' ...
 
-' First include the Base64 header file
-'$INCLUDE:'include/Base64.bi'
+' Load the resource.
+' The label name is generated based on the filename and size.
+' You can find the exact label name in the generated .bi file.
+RESTORE data_my_asset_png_bi_12345 
+DIM buffer AS STRING
+buffer = Base64_LoadResourceData
 
-' This label is from my_music_mp3.bi
-RESTORE data_my_music_mp3_8192
+' Now 'buffer' contains the binary data of my_asset.png
+' ...
 
-' This loads the encoded & compressed data from the DATA statements after the label above
-DIM buffer AS STRING: buffer = Base64_LoadResourceData 
+' At the end of your main code, before SUBs and FUNCTIONs:
 
-' Now do something with buffer
-...
+' Include the generated data file
+'$INCLUDE:'my_asset.png.bi'
 
-' Include the my_music.mp3.bi before your FUNCTIONs and SUBs
-'$INCLUDE:'my_music_mp3.bi'
+' At the bottom of you source code, after SUBs and FUNCTIONs:
 
-' OR
-
-' Place contents of my_music_mp3.bi before your FUNCTIONs and SUBs
-data_my_music_mp3_8192:
-DATA 8192,9877,0
-DATA ...
-
-' Finally, don't forget to include the Base64 module file
+' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
 '$INCLUDE:'include/Base64.bas'
 ```
 
-## API
+#### Example: Using a CONST string (`-c` switch)
+
+This mode is suitable for smaller files. It creates a `.bi` file containing `CONST` definitions.
+
+1. Generate the file: `Bin2Data -c my_icon.ico`
+    This will create `my_icon.ico.bi`.
+
+2. In your main QB64-PE program:
 
 ```vb
-FUNCTION Base64_Encode$ (s AS STRING)
-FUNCTION Base64_Decode$ (s AS STRING)
-FUNCTION Base64_LoadResourceString$ (src AS STRING, ogSize AS _UNSIGNED LONG, isComp AS _BYTE)
-FUNCTION Base64_LoadResourceData$
+' Include the generated constants file
+'$INCLUDE:'my_icon.ico.bi'
+
+' Your program logic here
+' ...
+
+' Load the resource using the generated CONSTs.
+' The CONST names are based on the filename and size.
+' Check the generated .bi file for the exact names.
+DIM buffer AS STRING
+buffer = Base64_LoadResourceString(DATA_MY_ICON_ICO_BI_123, SIZE_MY_ICON_ICO_BI_123, COMP_MY_ICON_ICO_BI_123)
+
+' Now 'buffer' contains the binary data of my_icon.ico
+' ...
+
+' At the bottom of you source code, after SUBs and FUNCTIONs:
+
+' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
+'$INCLUDE:'include/Base64.bas'
 ```
 
-## NOTES
+### C/C++ Projects
 
-* This requires the latest version of [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe)
-* When you clone a repository that contains submodules, the submodules are not automatically cloned by default
-* You will need to use the `git submodule update --init --recursive` to initialize, fetch and checkout git submodules
-* Get `Base64.bas` lite from [here](https://github.com/a740g/InForm-PE/blob/master/InForm/extensions/Base64.bas)
+When using the `-p` switch, `Bin2Data` generates a C header file (`.h`).
 
-## ASSETS
+1. Generate the file: `Bin2Data -p my_data.bin`
+    This will create `my_data.bin.h`.
+
+2. In your C/C++ code:
+
+```c
+#include "my_data.bin.h"
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    // The header defines symbols based on the filename and size, for example:
+    // - const uint8_t my_data_bin_h_567[] = {...}; (the data array)
+    // - #define SIZE_MY_DATA_BIN_H_567() 567       (original size)
+    // - #define COMP_MY_DATA_BIN_H_567() 1         (is compressed)
+    // - #define DATA_MY_DATA_BIN_H_567() ...       (pointer to data)
+    
+    // Note: If the data is compressed (COMP_...() is 1),
+    // you will need a zlib/deflate library to decompress it.
+    
+    size_t dataSize = sizeof(my_data_bin_h_567);
+    
+    printf("Original size: %d\n", SIZE_MY_DATA_BIN_H_567());
+    printf("Embedded size: %zu\n", dataSize);
+    printf("Is compressed: %d\n", COMP_MY_DATA_BIN_H_567());
+
+    // You can now use the my_data_bin_h_567 array.
+    
+    return 0;
+}
+```
+
+## Notes
+
+* This tool requires a [recent version](https://github.com/QB64-Phoenix-Edition/QB64pe/releases/latest) of [QB64-PE](https://www.qb64phoenix.com) to build.
+* When you clone a repository that contains submodules, you need to run `git submodule update --init --recursive` to fetch the submodule content.
+
+## Assets
 
 * [Icon](https://www.iconarchive.com/artist/umut-pulat.html) by [Umut Pulat](http://12m3.deviantart.com/)

@@ -1,18 +1,18 @@
 # Bin2Data
 
-`Bin2Data` is a command-line utility, written in [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe), that converts binary files into source code, making it easy to embed resources directly into your executables. It can also optionally compress the data.
+`Bin2Data` is a command-line utility, written in [QB64-PE](https://www.qb64phoenix.com), that converts binary files into source code, making it easy to embed resources directly into your executables. It can also optionally compress the data.
 
 ![Screenshot](screenshot.png)
 
 ## Features
 
 * Converts binary files into embeddable source code formats.
+* Optionally compresses data using QB64-PE's `_DEFLATE$` function.
 * Supports multiple output formats:
   * QB64-PE `DATA` statements (`.bi` file).
   * QB64-PE `CONST` string (`.bi` file).
   * C-style header with a `uint8_t` array (`.h` file).
 * Can also output a raw zlib/deflate compressed file (`.deflate`).
-* Optionally compresses data using QB64-PE's `_DEFLATE$` function.
 * Base64 encoding for QB64-PE `DATA` and `CONST` formats.
 * Command-line interface with support for wildcards for batch processing.
 
@@ -20,10 +20,9 @@
 
 ### 1. Build from source
 
-1. Clone this repository: `git clone https://github.com/a740g/Bin2Data.git`
+1. Clone this repository: `git clone --recurse-submodules https://github.com/a740g/Bin2Data.git`
 2. Change into the directory: `cd Bin2Data`
-3. Initialize and update the submodules: `git submodule update --init --recursive`
-4. Open `Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
+3. Open `Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
 
 ### 2. Command-Line Usage
 

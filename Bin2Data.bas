@@ -209,11 +209,7 @@ SUB MakeResource (fileName AS STRING)
     ' Get the base file name that we'll use to prefix before the generated extension
     DIM outputFileName AS STRING
 
-    IF LEN(Pathname_GetDriveOrScheme(fileName)) > 2 THEN
-        outputFileName = Pathname_Sanitize(Pathname_GetFileName(fileName))
-    ELSE
-        outputFileName = fileName
-    END IF
+    outputFileName = _IIF(LEN(Pathname_GetDriveOrScheme(fileName)) > 2, Pathname_Sanitize(Pathname_GetFileName(fileName)), fileName)
 
     ' Get the output file name
     SELECT CASE appOption.mode
@@ -253,11 +249,7 @@ SUB MakeResource (fileName AS STRING)
     ELSE
         PRINT "Compressing data (this may take some time) ... ";
         DIM compBuf AS STRING
-        IF appOption.compLevel THEN
-            compBuf = _DEFLATE$(buffer, appOption.compLevel)
-        ELSE
-            compBuf = _DEFLATE$(buffer)
-        END IF
+        compBuf = _IIF(appOption.compLevel, _DEFLATE$(buffer, appOption.compLevel), _DEFLATE$(buffer))
         PRINT "done"
 
         IF LEN(compBuf) < LEN(buffer) THEN
@@ -365,7 +357,7 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
     DIM text AS STRING: text = UCASE$(_TRIM$(idName))
 
     ' Check for empty string and strings that are too big to be allowed
-    IF LEN(text) = 0 OR LEN(text) > ID_NAME_LENGTH_MAX THEN EXIT FUNCTION
+    IF LEN(text) = 0 _ORELSE LEN(text) > ID_NAME_LENGTH_MAX THEN EXIT FUNCTION
 
     ' Load the keyword table if it was not loaded
     IF LEN(qb64peKeyword(0)) = 0 THEN
@@ -383,11 +375,9 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
         END IF
 
         ' Compare without leading `_` for $NOPREFIX cases
-        IF ASC(qb64peKeyword(i), 1) = _ASC_UNDERSCORE THEN
-            IF RIGHT$(qb64peKeyword(i), LEN(qb64peKeyword(i)) - 1) = text THEN
-                IsQB64Keyword = _TRUE
-                EXIT FUNCTION
-            END IF
+        IF ASC(qb64peKeyword(i), 1) = _ASC_UNDERSCORE _ANDALSO RIGHT$(qb64peKeyword(i), LEN(qb64peKeyword(i)) - 1) = text THEN
+            IsQB64Keyword = _TRUE
+            EXIT FUNCTION
         END IF
     NEXT i
 END FUNCTION
@@ -418,11 +408,8 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
     NEXT
 
     ' Check if the identifier begins with a single underscore
-    IF ASC(text, 1) = _ASC_UNDERSCORE THEN
-        ' Check if there's only one underscore at the beginning
-        IF LEN(text) > 1 AND ASC(text, 2) <> _ASC_UNDERSCORE THEN
-            text = "_" + text ' add another underscore to make it legal
-        END IF
+    IF ASC(text, 1) = _ASC_UNDERSCORE _ANDALSO LEN(text) > 1 _ANDALSO ASC(text, 2) <> _ASC_UNDERSCORE THEN
+        text = "_" + text ' add another underscore to make it legal
     END IF
 
     ' Check if the identifier ends with an underscore
@@ -447,7 +434,7 @@ END FUNCTION
 
 FUNCTION MakeIdentifier$ (fileName AS STRING, size AS _UNSIGNED LONG)
     DIM sizeText AS STRING: sizeText = LTRIM$(STR$(size))
-    DIM i AS _UNSIGNED LONG: i = ID_NAME_LENGTH_MAX - LEN(sizeText) - 6 ' ID_NAME_LENGTH_MAX - text size of file size - len("data_" + "_")
+    DIM i AS LONG: i = _MAX(1, ID_NAME_LENGTH_MAX - LEN(sizeText) - 6) ' ID_NAME_LENGTH_MAX - text size of file size - len("data_" + "_")
     DIM nameText AS STRING: nameText = MakeQB64LegalId(Pathname_GetFileName(fileName))
     IF LEN(nameText) > i THEN nameText = LEFT$(nameText, i) ' chop the name if everything is adding up to be more than LABEL_LENGTH_MAX chars
     MakeIdentifier = nameText + "_" + sizeText
@@ -530,7 +517,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
         PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, charPerLine); CHR$(_ASC_QUOTE);
 
         ' Now check if we need to write the line continuation combo for CONST string
-        IF srcSizeRem > 0 OR i < srcSizeMul - charPerLine THEN
+        IF srcSizeRem > 0 _ORELSE i < srcSizeMul - charPerLine THEN
             PRINT #fh, " +"; LINE_CONTINUATION ' write a string concat op and then a line continuation
         ELSE
             PRINT #fh, _STR_EMPTY ' move to the next line
@@ -538,7 +525,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     NEXT i
 
     IF srcSizeRem > 0 THEN
-        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, appOption.charPerLine); CHR$(_ASC_QUOTE)
+        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, charPerLine); CHR$(_ASC_QUOTE)
     END IF
 
     PRINT #fh, _STR_EMPTY ' put a newline (required for CONST!)

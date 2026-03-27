@@ -48,7 +48,7 @@ CONST GENERATE_RAW = 3 ' raw file dump (only if file is compressed)
 CONST FILE_EXT_BI = ".bi"
 CONST FILE_EXT_H = ".h"
 CONST FILE_EXT_DEFLATE = ".deflate"
-CONST ID_NAME_LENGTH_MAX = 40 ' QB64 indentifiers must be <= 40 chars :(
+CONST ID_NAME_LENGTH_MAX = 40 ' QB64 identifiers must be <= 40 chars :(
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -227,7 +227,7 @@ SUB MakeResource (fileName AS STRING)
             outputFileName = outputFileName + FILE_EXT_BI
     END SELECT
 
-    ' Quickly check if the output file exists and if show a message and exit
+    ' Quickly check if the output file exists and show a message then exit
     IF _NEGATE appOption.overwrite _ANDALSO _FILEEXISTS(outputFileName) THEN
         PRINT outputFileName; " already exists!"
         EXIT SUB
@@ -246,7 +246,9 @@ SUB MakeResource (fileName AS STRING)
     PRINT "File size is"; LEN(buffer); "bytes"
 
     ' Attempt to compress and see if we get any goodness
-    IF appOption.store THEN
+    DIM doStore AS _BYTE: doStore = appOption.store
+
+    IF doStore THEN
         PRINT "Stored"
     ELSE
         PRINT "Compressing data (this may take some time) ... ";
@@ -266,7 +268,7 @@ SUB MakeResource (fileName AS STRING)
                 PRINT "Compressed file size is more than the original size!"
                 EXIT SUB
             ELSE
-                appOption.store = _TRUE ' switch to store mode
+                doStore = _TRUE ' switch to store mode for this file only
             END IF
         END IF
     END IF
@@ -513,20 +515,22 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
 
     PRINT #fh, CONST_KEYWORD; "DATA_"; id; ASSIGNMENT_STRING; LINE_CONTINUATION ' write the const name
 
+    DIM charPerLine AS _UNSIGNED LONG: charPerLine = appOption.charPerLine
+
     ' Adjust character per line to work around QB64 limit if needed
-    IF LEN(buffer) \ appOption.charPerLine >= LINE_CONTINUATION_MAX - 2 THEN
-        appOption.charPerLine = (LEN(buffer) + LINE_CONTINUATION_MAX - 3) \ (LINE_CONTINUATION_MAX - 2)
-        PRINT "Characters per data line auto-changed to"; appOption.charPerLine
+    IF LEN(buffer) \ charPerLine >= LINE_CONTINUATION_MAX - 2 THEN
+        charPerLine = (LEN(buffer) + LINE_CONTINUATION_MAX - 3) \ (LINE_CONTINUATION_MAX - 2)
+        PRINT "Characters per data line auto-changed to"; charPerLine
     END IF
 
-    DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD appOption.charPerLine ' remainder
+    DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD charPerLine ' remainder
     DIM srcSizeMul AS _UNSIGNED LONG: srcSizeMul = LEN(buffer) - srcSizeRem ' exact multiple
 
-    DIM i AS _UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP appOption.charPerLine
-        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, appOption.charPerLine); CHR$(_ASC_QUOTE);
+    DIM i AS _UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP charPerLine
+        PRINT #fh, SPACE$(INDENT_SPACES); CHR$(_ASC_QUOTE); MID$(buffer, i, charPerLine); CHR$(_ASC_QUOTE);
 
         ' Now check if we need to write the line continuation combo for CONST string
-        IF srcSizeRem > 0 OR i < srcSizeMul - appOption.charPerLine THEN
+        IF srcSizeRem > 0 OR i < srcSizeMul - charPerLine THEN
             PRINT #fh, " +"; LINE_CONTINUATION ' write a string concat op and then a line continuation
         ELSE
             PRINT #fh, _STR_EMPTY ' move to the next line

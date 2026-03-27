@@ -3,19 +3,12 @@
 ' Copyright (c) 2026 Samuel Gomes
 '-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' HEADER FILES
-'-----------------------------------------------------------------------------------------------------------------------
 $LET TOOLBOX64_STRICT = TRUE
 
 '$INCLUDE:'include/Core/String.bi'
 '$INCLUDE:'include/FS/Pathname.bi'
 '$INCLUDE:'include/CLI/Args.bi'
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' METACOMMANDS
-'-----------------------------------------------------------------------------------------------------------------------
 $CONSOLE:ONLY
 $EXEICON:'./Bin2Data.ico'
 $VERSIONINFO:ProductName='Bin2Data'
@@ -29,11 +22,7 @@ $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
 $VERSIONINFO:FILEVERSION#=2,3,4,0
 $VERSIONINFO:PRODUCTVERSION#=2,3,4,0
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' CONSTANTS
-'-----------------------------------------------------------------------------------------------------------------------
 CONST BASE64_CHAR_PER_LINE_MIN = 2 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_MAX = 1024 * _SIZE_OF_LONG
@@ -49,11 +38,8 @@ CONST FILE_EXT_BI = ".bi"
 CONST FILE_EXT_H = ".h"
 CONST FILE_EXT_DEFLATE = ".deflate"
 CONST ID_NAME_LENGTH_MAX = 40 ' QB64 identifiers must be <= 40 chars :(
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' TYPES
-'-----------------------------------------------------------------------------------------------------------------------
+''' @brief A UDT that holds the global options for the application, which can be set via command line arguments.
 TYPE AppOptionType
     mode AS _UNSIGNED _BYTE ' see GENERATE_* CONSTs above
     charPerLine AS _UNSIGNED LONG ' characters / line
@@ -61,18 +47,9 @@ TYPE AppOptionType
     overwrite AS _BYTE ' overwrite output?
     store AS _BYTE ' bypass compression?
 END TYPE
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' GLOBAL VARIABLES
-'-----------------------------------------------------------------------------------------------------------------------
 DIM SHARED appOption AS AppOptionType ' global options
-REDIM qb64peKeyword(0 TO 0) AS STRING ' QB64-PE keywords array
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' MAIN
-'-----------------------------------------------------------------------------------------------------------------------
 SetDefaultAppOptions
 
 ' Change to the directory specified by the environment
@@ -191,11 +168,8 @@ DO
 LOOP WHILE LEN(argName)
 
 SYSTEM
-'-----------------------------------------------------------------------------------------------------------------------
 
-'-----------------------------------------------------------------------------------------------------------------------
-' FUNCTIONS & SUBROUTINES
-'-----------------------------------------------------------------------------------------------------------------------
+''' @brief Initializes the global application options to their default values, which can be overridden by command line arguments.
 SUB SetDefaultAppOptions
     appOption.mode = GENERATE_DATA
     appOption.charPerLine = BASE64_CHAR_PER_LINE_DEFAULT
@@ -204,7 +178,8 @@ SUB SetDefaultAppOptions
     appOption.store = _FALSE ' do not just store
 END SUB
 
-
+''' @brief Main function that handles the resource generation process, including file reading, optional compression, and delegating to the appropriate output function based on the selected mode.
+''' @param fileName The name of the input file to be processed and converted into a resource.
 SUB MakeResource (fileName AS STRING)
     ' Get the base file name that we'll use to prefix before the generated extension
     DIM outputFileName AS STRING
@@ -284,8 +259,9 @@ SUB MakeResource (fileName AS STRING)
     END SELECT
 END SUB
 
-
-' Returns true if idName is a QB64PE keyword
+''' @brief Checks if a given identifier name is a QB64-PE keyword, which would make it illegal to use as an identifier in the generated code.
+''' @param idName The identifier name to check against the list of QB64-PE keywords.
+''' @return Returns TRUE if the identifier is a QB64-PE keyword, and FALSE otherwise.
 FUNCTION IsQB64Keyword%% (idName AS STRING)
     ' This was plucked straight out of QB64-PE's 'syntax_highlighter_list.bas'
     ' We'll use this to build our QB64-PE keyword data table
@@ -352,37 +328,18 @@ FUNCTION IsQB64Keyword%% (idName AS STRING)
         "@_GLVERTEX3FV@_GLVERTEX3I@_GLVERTEX3IV@_GLVERTEX3S@_GLVERTEX3SV@_GLVERTEX4D@_GLVERTEX4DV@_GLVERTEX4F@_GLVERTEX4FV@_GLVERTEX4I@_GLVERTEX4IV@_GLVERTEX4S" + _
         "@_GLVERTEX4SV@_GLVERTEXPOINTER@_GLVIEWPORT@_WAVE@_WHEEL@_WIDTH@_WINDOWHANDLE@_WINDOWHASFOCUS@_WRITEFILE@WAIT@WEND@WHILE@WIDTH@WINDOW@WRITE@XOR@"
 
-    SHARED qb64peKeyword() AS STRING
-
     DIM text AS STRING: text = UCASE$(_TRIM$(idName))
 
     ' Check for empty string and strings that are too big to be allowed
     IF LEN(text) = 0 _ORELSE LEN(text) > ID_NAME_LENGTH_MAX THEN EXIT FUNCTION
 
-    ' Load the keyword table if it was not loaded
-    IF LEN(qb64peKeyword(0)) = 0 THEN
-        IF String_Tokenize(QB64PE_KEYWORDS, "@", _STR_EMPTY, _FALSE, qb64peKeyword()) < 1 THEN
-            ERROR _ERR_INTERNAL_ERROR
-        END IF
-    END IF
-
-    ' Check if this is a QB64-PE keyword
-    DIM i AS LONG: FOR i = 0 TO UBOUND(qb64peKeyword)
-        ' Simple compare
-        IF text = qb64peKeyword(i) THEN
-            IsQB64Keyword = _TRUE
-            EXIT FUNCTION
-        END IF
-
-        ' Compare without leading `_` for $NOPREFIX cases
-        IF ASC(qb64peKeyword(i), 1) = _ASC_UNDERSCORE _ANDALSO RIGHT$(qb64peKeyword(i), LEN(qb64peKeyword(i)) - 1) = text THEN
-            IsQB64Keyword = _TRUE
-            EXIT FUNCTION
-        END IF
-    NEXT i
+    ' Check if this is a QB64-PE keyword using @-delimited search
+    IsQB64Keyword = INSTR(QB64PE_KEYWORDS, "@" + text + "@") > 0
 END FUNCTION
 
-
+''' @brief Sanitizes a string to create a legal QB64 identifier, ensuring it does not conflict with QB64-PE keywords and adheres to length limits.
+''' @param idName The input string that is intended to be used as an identifier.
+''' @return A string that is a legal QB64 identifier, suitable for use as a label or constant name in the generated code.
 FUNCTION MakeQB64LegalId$ (idName AS STRING)
     CONST ID_CONFLICT_RESOLUTION_CHAR = "d"
 
@@ -431,7 +388,10 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
     MakeQB64LegalId = text
 END FUNCTION
 
-
+''' @brief Generates a legal QB64 identifier based on the file name and size, ensuring it does not conflict with QB64-PE keywords and adheres to length limits.
+''' @param fileName The name of the file for which the identifier is being generated.
+''' @param size The size of the data, which will be included in the identifier to ensure uniqueness and to provide information about the data.
+''' @return A string that is a legal QB64 identifier, suitable for use as a label or constant name in the generated code.
 FUNCTION MakeIdentifier$ (fileName AS STRING, size AS _UNSIGNED LONG)
     DIM sizeText AS STRING: sizeText = LTRIM$(STR$(size))
     DIM i AS LONG: i = _MAX(1, ID_NAME_LENGTH_MAX - LEN(sizeText) - 6) ' ID_NAME_LENGTH_MAX - text size of file size - len("data_" + "_")
@@ -440,7 +400,10 @@ FUNCTION MakeIdentifier$ (fileName AS STRING, size AS _UNSIGNED LONG)
     MakeIdentifier = nameText + "_" + sizeText
 END FUNCTION
 
-
+''' @brief Generates a QB64 DATA statement block with the data encoded in Base64 and some additional information about size and compression status.
+''' @param buffer The data to be written into the DATA statements.
+''' @param outputfileName The name of the output file to be created.
+''' @param ogSize The original size of the data before compression (if applicable).
 SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
     CONST DATA_STATEMENT = "DATA "
 
@@ -477,7 +440,10 @@ SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LO
     PRINT "Done"
 END SUB
 
-
+''' @brief Generates a QB64 CONST string with the data encoded in Base64 and some additional CONSTs for size and compression status.
+''' @param buffer The data to be written into the CONST string.
+''' @param outputfileName The name of the output file to be created.
+''' @param ogSize The original size of the data before compression (if applicable).
 SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
     CONST CONST_KEYWORD = "CONST "
     CONST ASSIGNMENT_STRING = " ="
@@ -535,7 +501,10 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     PRINT "Done"
 END SUB
 
-
+''' @brief Generates a C header file with a byte array containing the data and some macros for size and compression status.
+''' @param buffer The data to be written into the C array.
+''' @param outputfileName The name of the output header file to be created.
+''' @param ogSize The original size of the data before compression (if applicable).
 SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
     DIM f AS LONG: f = FREEFILE
     OPEN outputfileName FOR OUTPUT AS f
@@ -575,4 +544,3 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
 
     CLOSE #f
 END SUB
-'-----------------------------------------------------------------------------------------------------------------------

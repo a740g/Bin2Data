@@ -1,12 +1,40 @@
 # Ignore all
 *
+
 # Unignore all with extensions
 !*.*
+
 # Unignore all dirs
 !*/
-# Unignore include
-!include
-# Ignore all exe files
+
+# Unignore Makefile
+!Makefile
+
+# Ignore all executable files
+*.com
 *.exe
-# Ignore .vscode dir
+*.dll
+*.so
+*.dylib
+
+# Ignore compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.out
+
+# Ignore Visual Studio Code stuff
 .vscode
+.fake
+
+# Ignore Visual Studio stuff
+.vs
+
+# Ignore macOS stuff
+.DS_Store
+Bin2Data.command
+
+# Ignore Windows stuff
+Thumbs.db
+desktop.ini

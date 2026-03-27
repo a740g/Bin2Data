@@ -1,6 +1,6 @@
 '-----------------------------------------------------------------------------------------------------------------------
 ' QB64-PE Binary to DATA converter
-' Copyright (c) 2025 Samuel Gomes
+' Copyright (c) 2026 Samuel Gomes
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -8,8 +8,9 @@
 '-----------------------------------------------------------------------------------------------------------------------
 $LET TOOLBOX64_STRICT = TRUE
 
-'$INCLUDE:'include/String/StringOps.bi'
+'$INCLUDE:'include/Core/String.bi'
 '$INCLUDE:'include/FS/Pathname.bi'
+'$INCLUDE:'include/CLI/Args.bi'
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -19,15 +20,15 @@ $CONSOLE:ONLY
 $EXEICON:'./Bin2Data.ico'
 $VERSIONINFO:ProductName='Bin2Data'
 $VERSIONINFO:CompanyName='Samuel Gomes'
-$VERSIONINFO:LegalCopyright='Copyright (c) 2025 Samuel Gomes'
+$VERSIONINFO:LegalCopyright='Copyright (c) 2026 Samuel Gomes'
 $VERSIONINFO:LegalTrademarks='All trademarks are property of their respective owners'
 $VERSIONINFO:Web='https://github.com/a740g'
 $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,3,3,0
-$VERSIONINFO:PRODUCTVERSION#=2,3,3,0
+$VERSIONINFO:FILEVERSION#=2,3,4,0
+$VERSIONINFO:PRODUCTVERSION#=2,3,4,0
 '-----------------------------------------------------------------------------------------------------------------------
 
 '-----------------------------------------------------------------------------------------------------------------------
@@ -81,7 +82,7 @@ CHDIR _STARTDIR$
 IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
     COLOR 7
     PRINT "Bin2Data: Converts binary files to QB64-PE data"
-    PRINT "Copyright (c) 2025 Samuel Gomes"
+    PRINT "Copyright (c) 2026 Samuel Gomes"
     PRINT "https://github.com/a740g"
     PRINT
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
@@ -105,24 +106,23 @@ IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetA
     PRINT "Usage:"
     PRINT " 1. Encode the binary file using Bin2Data"
     PRINT " 2. Include the file or it's contents"
-    PRINT " 3. Include Base64.bi at the top of your source (if using the Toolbox64 version)"
-    PRINT " 4. Include Base64.bas at the bottom of your source"
-    PRINT " 5. Load the file:"
+    PRINT " 3. Include Resource/Resource.bi at the top of your source (if using the Toolbox64 version)"
+    PRINT " 4. Load the file:"
     COLOR 11
     PRINT "     DATA mode:"
     COLOR 14
     PRINT "         RESTORE label_generated_by_bin2data"
     PRINT "         DIM buffer AS STRING"
-    PRINT "         buffer = Base64_LoadResourceData"
+    PRINT "         buffer = Resource_LoadBase64Data"
     PRINT
     COLOR 11
     PRINT "     CONST mode:"
     COLOR 14
     PRINT "         DIM buffer AS STRING"
-    PRINT "         buffer = Base64_LoadResourceString(STRING_DATA_CONST, ORIGINAL_SIZE_CONST, IS_COMPRESSED_CONST)"
+    PRINT "         buffer = Resource_LoadBase64String(STRING_DATA_CONST, ORIGINAL_SIZE_CONST, IS_COMPRESSED_CONST)"
     COLOR 7
     PRINT
-    PRINT "Get Base64.bas lite from: https://github.com/a740g/InForm-PE/blob/master/InForm/extensions/Base64.bas"
+    PRINT "Get the library here: https://github.com/a740g/Toolbox64"
     SYSTEM
 END IF
 
@@ -493,7 +493,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     CONST CONST_KEYWORD = "CONST "
     CONST ASSIGNMENT_STRING = " ="
     CONST LINE_CONTINUATION = " _"
-    CONST LINE_CONTINUATION_MAX = 499
+    CONST LINE_CONTINUATION_MAX = 500
 
     ' Open the output file
     DIM fh AS LONG: fh = FREEFILE
@@ -584,13 +584,4 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
 
     CLOSE #f
 END SUB
-'-----------------------------------------------------------------------------------------------------------------------
-
-'-----------------------------------------------------------------------------------------------------------------------
-' MODULE FILES
-'-----------------------------------------------------------------------------------------------------------------------
-'$INCLUDE:'include/CLI/Args.bas'
-'$INCLUDE:'include/String/StringOps.bas'
-'$INCLUDE:'include/FS/Pathname.bas'
-'-----------------------------------------------------------------------------------------------------------------------
 '-----------------------------------------------------------------------------------------------------------------------

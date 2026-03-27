@@ -88,8 +88,8 @@ IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetA
     PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
     PRINT "   -w: A number specifying the number of characters per data line."; BASE64_CHAR_PER_LINE_MIN; "-"; BASE64_CHAR_PER_LINE_MAX; "(default"; STR$(appOption.charPerLine); ")"
     PRINT "   -i: A number specifying the compression level."; COMP_LEVEL_MIN; "-"; COMP_LEVEL_MAX
-    PRINT "   -d: Generate DATA (.bas; default)"
-    PRINT "   -c: Generate a CONST (.bas; suitable for small files)"
+    PRINT "   -d: Generate DATA (.bi; default)"
+    PRINT "   -c: Generate a CONST (.bi; suitable for small files)"
     PRINT "   -p: Generate a C array (.h)"
     PRINT "   -r: Dump the raw compressed file (.deflate)"
     PRINT "   -s: Disable compression and store the file instead"
@@ -515,7 +515,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
 
     ' Adjust character per line to work around QB64 limit if needed
     IF LEN(buffer) \ appOption.charPerLine >= LINE_CONTINUATION_MAX - 2 THEN
-        appOption.charPerLine = LEN(buffer) \ (LINE_CONTINUATION_MAX - 2)
+        appOption.charPerLine = (LEN(buffer) + LINE_CONTINUATION_MAX - 3) \ (LINE_CONTINUATION_MAX - 2)
         PRINT "Characters per data line auto-changed to"; appOption.charPerLine
     END IF
 

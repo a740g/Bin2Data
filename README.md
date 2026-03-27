@@ -30,14 +30,14 @@ You can run `Bin2Data` from your terminal. The help screen shows the available o
 
 ```text
 Bin2Data: Converts binary files to QB64-PE data
-Copyright (c) 2025 Samuel Gomes
+Copyright (c) 2026 Samuel Gomes
 https://github.com/a740g
 
 Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]
    -w: A number specifying the number of characters per data line. 8-4096 (default 112)
    -i: A number specifying the compression level. 1-10
-   -d: Generate DATA (.bas; default)
-   -c: Generate a CONST (.bas; suitable for small files)
+   -d: Generate DATA (.bi; default)
+   -c: Generate a CONST (.bi; suitable for small files)
    -p: Generate a C array (.h)
    -r: Dump the raw compressed file (.deflate)
    -s: Disable compression and store the file instead
@@ -56,7 +56,7 @@ Note:
 
 ### QB64-PE Projects
 
-For QB64-PE, you need `Base64.bas` from the [Toolbox64](https://github.com/a740g/Toolbox64) library.
+For QB64-PE, you need `Resource/Resource.bi` from the [Toolbox64](https://github.com/a740g/Toolbox64) library.
 
 #### Example: Using DATA statements (`-d` switch)
 
@@ -68,28 +68,21 @@ This is the default mode. It creates a `.bi` file containing a `RESTORE` label a
 2. In your main QB64-PE program:
 
 ```vb
-' Your program logic here
-' ...
+' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
+'$INCLUDE:'include/Resource/Resource.bi'
+
+' Include the generated data file
+'$INCLUDE:'my_asset.png.bi'
 
 ' Load the resource.
 ' The label name is generated based on the filename and size.
 ' You can find the exact label name in the generated .bi file.
 RESTORE data_my_asset_png_bi_12345 
 DIM buffer AS STRING
-buffer = Base64_LoadResourceData
+buffer = Resource_LoadBase64Data
 
 ' Now 'buffer' contains the binary data of my_asset.png
 ' ...
-
-' At the end of your main code, before SUBs and FUNCTIONs:
-
-' Include the generated data file
-'$INCLUDE:'my_asset.png.bi'
-
-' At the bottom of you source code, after SUBs and FUNCTIONs:
-
-' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
-'$INCLUDE:'include/Base64.bas'
 ```
 
 #### Example: Using a CONST string (`-c` switch)
@@ -102,25 +95,20 @@ This mode is suitable for smaller files. It creates a `.bi` file containing `CON
 2. In your main QB64-PE program:
 
 ```vb
+' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
+'$INCLUDE:'include/Resource/Resource.bi'
+
 ' Include the generated constants file
 '$INCLUDE:'my_icon.ico.bi'
-
-' Your program logic here
-' ...
 
 ' Load the resource using the generated CONSTs.
 ' The CONST names are based on the filename and size.
 ' Check the generated .bi file for the exact names.
 DIM buffer AS STRING
-buffer = Base64_LoadResourceString(DATA_MY_ICON_ICO_BI_123, SIZE_MY_ICON_ICO_BI_123, COMP_MY_ICON_ICO_BI_123)
+buffer = Resource_LoadBase64String(DATA_MY_ICON_ICO_BI_123, SIZE_MY_ICON_ICO_BI_123, COMP_MY_ICON_ICO_BI_123)
 
 ' Now 'buffer' contains the binary data of my_icon.ico
 ' ...
-
-' At the bottom of you source code, after SUBs and FUNCTIONs:
-
-' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
-'$INCLUDE:'include/Base64.bas'
 ```
 
 ### C/C++ Projects

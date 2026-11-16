@@ -19,8 +19,8 @@ $VERSIONINFO:Comments='https://github.com/a740g'
 $VERSIONINFO:InternalName='Bin2Data'
 $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
-$VERSIONINFO:FILEVERSION#=2,3,4,0
-$VERSIONINFO:PRODUCTVERSION#=2,3,4,0
+$VERSIONINFO:FILEVERSION#=2,4,0,0
+$VERSIONINFO:PRODUCTVERSION#=2,4,0,0
 $EXEICON:'./Bin2Data.ico'
 
 '$INCLUDE:'Args.bi'

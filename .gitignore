@@ -1,40 +1,41 @@
-# Ignore all
 *
-
-# Unignore all with extensions
 !*.*
-
-# Unignore all dirs
 !*/
-
-# Unignore Makefile
 !Makefile
-
-# Ignore all executable files
 *.com
 *.exe
 *.dll
 *.so
 *.dylib
-
-# Ignore compiled files
 *.o
 *.obj
 *.a
 *.lib
 *.out
-
-# Ignore Visual Studio Code stuff
-.vscode
-.fake
-
-# Ignore Visual Studio stuff
-.vs
-
-# Ignore macOS stuff
+*.log
+.vs/
+.vscode/
+.fake/
+.copilot/
+.claude/
+.codex/
+.codeium/
+.windsurf/
+.devin/
+.gemini/
+.idea/
+.cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+/scratch/
+/temp/
+/tmp/
 .DS_Store
-Bin2Data.command
-
-# Ignore Windows stuff
 Thumbs.db
 desktop.ini
+*.lnk
+*.dSYM
+*.command

@@ -3,14 +3,13 @@
 ' Copyright (c) 2026 Samuel Gomes
 '-----------------------------------------------------------------------------------------------------------------------
 
-$LET TOOLBOX64_STRICT = TRUE
-
-'$INCLUDE:'include/Core/String.bi'
-'$INCLUDE:'include/FS/Pathname.bi'
-'$INCLUDE:'include/CLI/Args.bi'
-
 $CONSOLE:ONLY
-$EXEICON:'./Bin2Data.ico'
+
+_DEFINE A-Z AS LONG
+OPTION _EXPLICIT
+'$STATIC
+OPTION BASE 1
+
 $VERSIONINFO:ProductName='Bin2Data'
 $VERSIONINFO:CompanyName='Samuel Gomes'
 $VERSIONINFO:LegalCopyright='Copyright (c) 2026 Samuel Gomes'
@@ -22,6 +21,11 @@ $VERSIONINFO:OriginalFilename='Bin2Data.exe'
 $VERSIONINFO:FileDescription='Bin2Data executable'
 $VERSIONINFO:FILEVERSION#=2,3,4,0
 $VERSIONINFO:PRODUCTVERSION#=2,3,4,0
+$EXEICON:'./Bin2Data.ico'
+
+'$INCLUDE:'Args.bi'
+'$INCLUDE:'Pathname.bi'
+'$INCLUDE:'File.bi'
 
 CONST BASE64_CHAR_PER_LINE_MIN = 2 * _SIZE_OF_LONG
 CONST BASE64_CHAR_PER_LINE_DEFAULT = 28 * _SIZE_OF_LONG
@@ -49,125 +53,6 @@ TYPE AppOptionType
 END TYPE
 
 DIM SHARED appOption AS AppOptionType ' global options
-
-SetDefaultAppOptions
-
-' Change to the directory specified by the environment
-CHDIR _STARTDIR$
-
-' If there are no command line parameters just show some info and exit
-IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
-    COLOR 7
-    PRINT "Bin2Data: Converts binary files to QB64-PE data"
-    PRINT "Copyright (c) 2026 Samuel Gomes"
-    PRINT "https://github.com/a740g"
-    PRINT
-    PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
-    PRINT "   -w: A number specifying the number of characters per data line."; BASE64_CHAR_PER_LINE_MIN; "-"; BASE64_CHAR_PER_LINE_MAX; "(default"; STR$(appOption.charPerLine); ")"
-    PRINT "   -i: A number specifying the compression level."; COMP_LEVEL_MIN; "-"; COMP_LEVEL_MAX
-    PRINT "   -d: Generate DATA (.bi; default)"
-    PRINT "   -c: Generate a CONST (.bi; suitable for small files)"
-    PRINT "   -p: Generate a C array (.h)"
-    PRINT "   -r: Dump the raw compressed file (.deflate)"
-    PRINT "   -s: Disable compression and store the file instead"
-    PRINT "   -o: Overwrite output file if it exists"
-    PRINT
-    PRINT "Note:"
-    PRINT " * Will create filespec.bi/.h/.deflate (based on the switches)"
-    PRINT " * Can bulk convert files using wildcards"
-    PRINT " * filespec can be a URL"
-    PRINT " * If filespec.bi/.h/.deflate exists, then it will not be overwritten (unless -o is specified)"
-    PRINT " * Character per line may be changed in CONST mode due to QB64's 500 line continuation limit"
-    PRINT " * C output is barebones. Use sizeof to get the array size"
-    PRINT
-    PRINT "Usage:"
-    PRINT " 1. Encode the binary file using Bin2Data"
-    PRINT " 2. Include the file or it's contents"
-    PRINT " 3. Include Resource/Resource.bi at the top of your source (if using the Toolbox64 version)"
-    PRINT " 4. Load the file:"
-    COLOR 11
-    PRINT "     DATA mode:"
-    COLOR 14
-    PRINT "         RESTORE label_generated_by_bin2data"
-    PRINT "         DIM buffer AS STRING"
-    PRINT "         buffer = Resource_LoadBase64Data"
-    PRINT
-    COLOR 11
-    PRINT "     CONST mode:"
-    COLOR 14
-    PRINT "         DIM buffer AS STRING"
-    PRINT "         buffer = Resource_LoadBase64String(STRING_DATA_CONST, ORIGINAL_SIZE_CONST, IS_COMPRESSED_CONST)"
-    COLOR 7
-    PRINT
-    PRINT "Get the library here: https://github.com/a740g/Toolbox64"
-    SYSTEM
-END IF
-
-PRINT
-
-' Convert all files requested
-DIM argName AS STRING
-DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
-
-DO
-    argName = Args_GetArgumentName("w|width|i|d|data|c|const|p|r|raw|s|store|o|overwrite", argIndex)
-
-    SELECT CASE argName
-        CASE _STR_EMPTY ' no more arguments
-            EXIT DO
-
-        CASE "w", "width"
-            argIndex = argIndex + 1 ' value at next index
-            appOption.charPerLine = _CLAMP(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
-            PRINT "Characters per data line set to"; appOption.charPerLine
-
-        CASE "i"
-            argIndex = argIndex + 1 ' value at next index
-            appOption.compLevel = _CLAMP(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
-            PRINT "Compression level set to"; appOption.compLevel
-
-        CASE "d", "data"
-            appOption.mode = GENERATE_DATA
-            PRINT "DATA generation enabled"
-
-        CASE "c", "const"
-            appOption.mode = GENERATE_CONST
-            PRINT "CONST generation enabled"
-
-        CASE "p"
-            appOption.mode = GENERATE_CARR
-            PRINT "C array generation enabled"
-
-        CASE "r", "raw"
-            appOption.mode = GENERATE_RAW
-            PRINT "Raw dump enabled"
-
-            IF appOption.store THEN
-                appOption.store = _FALSE
-                PRINT "Store mode disabled"
-            END IF
-
-        CASE "s", "store"
-            IF appOption.mode = GENERATE_RAW THEN
-                appOption.store = _FALSE
-                PRINT "Cannot enable store mode when raw dump is enabled"
-            ELSE
-                appOption.store = _TRUE
-                PRINT "Store mode enabled"
-            END IF
-
-        CASE "o", "overwrite"
-            appOption.overwrite = _TRUE
-            PRINT "Overwrite mode enabled"
-
-        CASE ELSE ' probably a file name
-            MakeResource argName
-    END SELECT
-
-    argIndex = argIndex + 1 ' move to the next index
-LOOP WHILE LEN(argName)
-
-SYSTEM
 
 ''' @brief Initializes the global application options to their default values, which can be overridden by command line arguments.
 SUB SetDefaultAppOptions
@@ -206,7 +91,7 @@ SUB MakeResource (fileName AS STRING)
 
     ' Load and compress the file (if needed)
     ' We are doing this here since this step is common for all modes
-    DIM buffer AS STRING: buffer = _READFILE$(fileName)
+    DIM buffer AS STRING: buffer = File_Load(fileName)
     DIM ogBufSize AS _UNSIGNED LONG: ogBufSize = LEN(buffer) ' we'll need this later
 
     IF LEN(buffer) < 1 THEN
@@ -544,3 +429,124 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
 
     CLOSE #f
 END SUB
+
+' ENTRY POINT
+
+SetDefaultAppOptions
+
+' Change to the directory specified by the environment
+CHDIR _STARTDIR$
+
+' If there are no command line parameters just show some info and exit
+IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
+    COLOR 7
+    PRINT "Bin2Data: Converts binary files to QB64-PE data"
+    PRINT "Copyright (c) 2026 Samuel Gomes"
+    PRINT "https://github.com/a740g"
+    PRINT
+    PRINT "Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]"
+    PRINT "   -w: A number specifying the number of characters per data line."; BASE64_CHAR_PER_LINE_MIN; "-"; BASE64_CHAR_PER_LINE_MAX; "(default"; STR$(appOption.charPerLine); ")"
+    PRINT "   -i: A number specifying the compression level."; COMP_LEVEL_MIN; "-"; COMP_LEVEL_MAX
+    PRINT "   -d: Generate DATA (.bi; default)"
+    PRINT "   -c: Generate a CONST (.bi; suitable for small files)"
+    PRINT "   -p: Generate a C array (.h)"
+    PRINT "   -r: Dump the raw compressed file (.deflate)"
+    PRINT "   -s: Disable compression and store the file instead"
+    PRINT "   -o: Overwrite output file if it exists"
+    PRINT
+    PRINT "Note:"
+    PRINT " * Will create filespec.bi/.h/.deflate (based on the switches)"
+    PRINT " * Can bulk convert files using wildcards"
+    PRINT " * filespec can be a URL"
+    PRINT " * If filespec.bi/.h/.deflate exists, then it will not be overwritten (unless -o is specified)"
+    PRINT " * Character per line may be changed in CONST mode due to QB64's 500 line continuation limit"
+    PRINT " * C output is barebones. Use sizeof to get the array size"
+    PRINT
+    PRINT "Usage:"
+    PRINT " 1. Encode the binary file using Bin2Data"
+    PRINT " 2. Include the file or it's contents"
+    PRINT " 3. Include Resource/Resource.bi at the top of your source (if using the Toolbox64 version)"
+    PRINT " 4. Load the file:"
+    COLOR 11
+    PRINT "     DATA mode:"
+    COLOR 14
+    PRINT "         RESTORE label_generated_by_bin2data"
+    PRINT "         DIM buffer AS STRING"
+    PRINT "         buffer = Resource_LoadBase64Data"
+    PRINT
+    COLOR 11
+    PRINT "     CONST mode:"
+    COLOR 14
+    PRINT "         DIM buffer AS STRING"
+    PRINT "         buffer = Resource_LoadBase64String(STRING_DATA_CONST, ORIGINAL_SIZE_CONST, IS_COMPRESSED_CONST)"
+    COLOR 7
+    PRINT
+    PRINT "Get the library here: https://github.com/a740g/Toolbox64"
+    SYSTEM
+END IF
+
+PRINT
+
+' Convert all files requested
+DIM argName AS STRING
+DIM argIndex AS LONG: argIndex = 1 ' start with the first argument
+
+DO
+    argName = Args_GetArgumentName("w|width|i|d|data|c|const|p|r|raw|s|store|o|overwrite", argIndex)
+
+    SELECT CASE argName
+        CASE _STR_EMPTY ' no more arguments
+            EXIT DO
+
+        CASE "w", "width"
+            argIndex = argIndex + 1 ' value at next index
+            appOption.charPerLine = _CLAMP(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
+            PRINT "Characters per data line set to"; appOption.charPerLine
+
+        CASE "i"
+            argIndex = argIndex + 1 ' value at next index
+            appOption.compLevel = _CLAMP(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
+            PRINT "Compression level set to"; appOption.compLevel
+
+        CASE "d", "data"
+            appOption.mode = GENERATE_DATA
+            PRINT "DATA generation enabled"
+
+        CASE "c", "const"
+            appOption.mode = GENERATE_CONST
+            PRINT "CONST generation enabled"
+
+        CASE "p"
+            appOption.mode = GENERATE_CARR
+            PRINT "C array generation enabled"
+
+        CASE "r", "raw"
+            appOption.mode = GENERATE_RAW
+            PRINT "Raw dump enabled"
+
+            IF appOption.store THEN
+                appOption.store = _FALSE
+                PRINT "Store mode disabled"
+            END IF
+
+        CASE "s", "store"
+            IF appOption.mode = GENERATE_RAW THEN
+                appOption.store = _FALSE
+                PRINT "Cannot enable store mode when raw dump is enabled"
+            ELSE
+                appOption.store = _TRUE
+                PRINT "Store mode enabled"
+            END IF
+
+        CASE "o", "overwrite"
+            appOption.overwrite = _TRUE
+            PRINT "Overwrite mode enabled"
+
+        CASE ELSE ' probably a file name
+            MakeResource argName
+    END SELECT
+
+    argIndex = argIndex + 1 ' move to the next index
+LOOP WHILE LEN(argName)
+
+SYSTEM

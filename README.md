@@ -20,9 +20,9 @@
 
 ### 1. Build from source
 
-1. Clone this repository: `git clone --recurse-submodules https://github.com/a740g/Bin2Data.git`
+1. Clone this repository: `git clone https://github.com/a740g/Bin2Data.git`
 2. Change into the directory: `cd Bin2Data`
-3. Open `Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
+3. Build using `make` (or `mingw32-make` on Windows), or open `source/Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
 
 ### 2. Command-Line Usage
 
@@ -150,7 +150,6 @@ int main() {
 ## Notes
 
 * This tool requires a [recent version](https://github.com/QB64-Phoenix-Edition/QB64pe/releases/latest) of [QB64-PE](https://www.qb64phoenix.com) to build.
-* When you clone a repository that contains submodules, you need to run `git submodule update --init --recursive` to fetch the submodule content.
 
 ## Assets
 

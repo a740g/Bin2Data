@@ -1,0 +1,13 @@
+Hello, QB64-PE Bin2Data!
+This is a sample file used for automated tests.
+Testing binary to DATA conversion with enough compressible text.
+Hello, QB64-PE Bin2Data!
+This is a sample file used for automated tests.
+Testing binary to DATA conversion with enough compressible text.
+Hello, QB64-PE Bin2Data!
+This is a sample file used for automated tests.
+Testing binary to DATA conversion with enough compressible text.
+Hello, QB64-PE Bin2Data!
+This is a sample file used for automated tests.
+Testing binary to DATA conversion with enough compressible text.
+1234567890!@#$%^&*()_+

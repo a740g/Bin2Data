@@ -39,3 +39,6 @@ desktop.ini
 *.lnk
 *.dSYM
 *.command
+tests/*.bi
+tests/*.h
+tests/*.deflate

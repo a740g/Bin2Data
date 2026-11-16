@@ -1,32 +1,61 @@
 # Bin2Data
 
-`Bin2Data` is a command-line utility, written in [QB64-PE](https://www.qb64phoenix.com), that converts binary files into source code, making it easy to embed resources directly into your executables. It can also optionally compress the data.
+`Bin2Data` is a command-line utility, written in [QB64-PE](https://www.qb64phoenix.com), that converts binary files into source code, making it easy to embed resources directly into your executables. It also optionally compresses data using QB64-PE's native `_DEFLATE$` routine.
 
 ![Screenshot](screenshots/screenshot.png)
 
 ## Features
 
 * Converts binary files into embeddable source code formats.
-* Optionally compresses data using QB64-PE's `_DEFLATE$` function.
-* Supports multiple output formats:
-  * QB64-PE `DATA` statements (`.bi` file).
-  * QB64-PE `CONST` string (`.bi` file).
-  * C-style header with a `uint8_t` array (`.h` file).
-* Can also output a raw zlib/deflate compressed file (`.deflate`).
-* Base64 encoding for QB64-PE `DATA` and `CONST` formats.
-* Command-line interface with support for wildcards for batch processing.
+* Optionally compresses data using QB64-PE's native `_DEFLATE$` function.
+* Multiple output formats supported:
+  * QB64-PE `DATA` statements (`.bi` file, default).
+  * QB64-PE `CONST` string (`.bi` file, suitable for smaller assets).
+  * C header with a `const uint8_t` array (`.h` file) for QB64-PE `DECLARE LIBRARY`.
+  * Raw Deflate/zlib compressed binary stream (`.deflate` file).
+* Base64 encoding for QB64-PE `DATA` and `CONST` outputs.
+* Automatic fallback to store mode if compression does not reduce file size.
+* Command-line interface with wildcard and batch processing support across Windows, Linux, and macOS.
+* Direct URL fetching and encoding (HTTP/HTTPS).
 
-## Building and Using Bin2Data
+## Building and Running
 
-### 1. Build from source
+### Prerequisites
 
-1. Clone this repository: `git clone https://github.com/a740g/Bin2Data.git`
-2. Change into the directory: `cd Bin2Data`
-3. Build using `make` (or `mingw32-make` on Windows), or open `source/Bin2Data.bas` in the QB64-PE IDE and press `F5` to compile it.
+* The latest version of [QB64-PE](https://github.com/QB64-Phoenix-Edition/QB64pe/releases).
 
-### 2. Command-Line Usage
+### Method 1: Using the Makefile (Recommended)
 
-You can run `Bin2Data` from your terminal. The help screen shows the available options.
+A cross-platform [Makefile](Makefile) is included for building with GNU Make or `mingw32-make`:
+
+```sh
+# Build the application (outputs Bin2Data in the repository root)
+make
+
+# Build with C++ compiler optimizations enabled
+make release
+
+# Run the test suite
+make test
+
+# Remove build artifacts
+make clean
+```
+
+### Method 2: Command-Line Compilation
+
+Compile directly using the QB64-PE compiler:
+
+```sh
+qb64pe -x -w -e source/Bin2Data.bas -o Bin2Data
+```
+
+### Method 3: Using the QB64-PE IDE
+
+1. Open `source/Bin2Data.bas` in the QB64-PE IDE.
+2. Press `F5` to compile and run.
+
+## Command-Line Usage
 
 ```text
 Bin2Data: Converts binary files to QB64-PE data
@@ -34,123 +63,29 @@ Copyright (c) 2026 Samuel Gomes
 https://github.com/a740g
 
 Usage: Bin2Data [-w characters_per_data_line] [-i compression_level] [-d] [-c] [-p] [-r] [-s] [-o] [filespec]
-   -w: A number specifying the number of characters per data line. 8-4096 (default 112)
-   -i: A number specifying the compression level. 1-10
+   -w: A number specifying the number of characters per data line. 8 - 4096 (default 112)
+   -i: A number specifying the compression level. 1 - 10
    -d: Generate DATA (.bi; default)
    -c: Generate a CONST (.bi; suitable for small files)
    -p: Generate a C array (.h)
    -r: Dump the raw compressed file (.deflate)
    -s: Disable compression and store the file instead
    -o: Overwrite output file if it exists
-
-Note:
- * Will create filespec.bi/.h/.deflate (based on the switches)
- * Can bulk convert files using wildcards
- * filespec can be a URL
- * If filespec.bi/.h/.deflate exists, then it will not be overwritten (unless -o is specified)
- * Character per line may be changed in CONST mode due to QB64's 500 line continuation limit
- * C output is barebones. Use sizeof to get the array size
 ```
 
-## Using the Generated Files
+## Documentation & Code Examples
 
-### QB64-PE Projects
+Comprehensive documentation and code listings for all use cases are available in **[docs/README.md](docs/README.md)**:
 
-For QB64-PE, you need `Resource/Resource.bi` from the [Toolbox64](https://github.com/a740g/Toolbox64) library.
+* **[QB64-PE DATA Statements (`-d`)](docs/README.md#use-case-1-qb64-pe-data-statements--d)**: Loading embedded resources using [Toolbox64](https://github.com/a740g/Toolbox64) (`Resource_LoadBase64Data`) or standalone decoder routines.
+* **[QB64-PE CONST Strings (`-c`)](docs/README.md#use-case-2-qb64-pe-const-strings--c)**: Loading constant string resources with automatic line-continuation limit handling.
+* **[C Header Arrays in QB64-PE (`-p`)](docs/README.md#use-case-3-c-header-arrays-in-qb64-pe--p)**: Consuming generated C headers in QB64-PE via `DECLARE LIBRARY`.
+* **[Raw Deflate Dumps (`-r`)](docs/README.md#use-case-4-raw-deflate-dumps--r)**: Creating and decompressing raw deflate binary streams.
+* **[Width & Compression Tuning (`-w`, `-i`, `-s`)](docs/README.md#use-case-5-custom-width-and-compression-control)**: Adjusting formatting width and compression levels.
+* **[Batch & Wildcard Conversions](docs/README.md#use-case-6-batch-and-wildcard-processing)**: Batch processing asset folders.
+* **[Direct URL Embedding](docs/README.md#use-case-7-remote-file-and-url-conversion)**: Downloading and embedding remote web assets.
 
-#### Example: Using DATA statements (`-d` switch)
+## Assets & License
 
-This is the default mode. It creates a `.bi` file containing a `RESTORE` label and `DATA` statements.
-
-1. Generate the file: `Bin2Data my_asset.png`
-    This will create `my_asset.png.bi`.
-
-2. In your main QB64-PE program:
-
-```vb
-' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
-'$INCLUDE:'include/Resource/Resource.bi'
-
-' Include the generated data file
-'$INCLUDE:'my_asset.png.bi'
-
-' Load the resource.
-' The label name is generated based on the filename and size.
-' You can find the exact label name in the generated .bi file.
-RESTORE data_my_asset_png_bi_12345 
-DIM buffer AS STRING
-buffer = Resource_LoadBase64Data
-
-' Now 'buffer' contains the binary data of my_asset.png
-' ...
-```
-
-#### Example: Using a CONST string (`-c` switch)
-
-This mode is suitable for smaller files. It creates a `.bi` file containing `CONST` definitions.
-
-1. Generate the file: `Bin2Data -c my_icon.ico`
-    This will create `my_icon.ico.bi`.
-
-2. In your main QB64-PE program:
-
-```vb
-' Include the library implementation (assuming you have cloned Toolbox64 in the include directory under your project directory)
-'$INCLUDE:'include/Resource/Resource.bi'
-
-' Include the generated constants file
-'$INCLUDE:'my_icon.ico.bi'
-
-' Load the resource using the generated CONSTs.
-' The CONST names are based on the filename and size.
-' Check the generated .bi file for the exact names.
-DIM buffer AS STRING
-buffer = Resource_LoadBase64String(DATA_MY_ICON_ICO_BI_123, SIZE_MY_ICON_ICO_BI_123, COMP_MY_ICON_ICO_BI_123)
-
-' Now 'buffer' contains the binary data of my_icon.ico
-' ...
-```
-
-### C/C++ Projects
-
-When using the `-p` switch, `Bin2Data` generates a C header file (`.h`).
-
-1. Generate the file: `Bin2Data -p my_data.bin`
-    This will create `my_data.bin.h`.
-
-2. In your C/C++ code:
-
-```c
-#include "my_data.bin.h"
-#include <stdio.h>
-#include <string.h>
-
-int main() {
-    // The header defines symbols based on the filename and size, for example:
-    // - const uint8_t my_data_bin_h_567[] = {...}; (the data array)
-    // - #define SIZE_MY_DATA_BIN_H_567() 567       (original size)
-    // - #define COMP_MY_DATA_BIN_H_567() 1         (is compressed)
-    // - #define DATA_MY_DATA_BIN_H_567() ...       (pointer to data)
-    
-    // Note: If the data is compressed (COMP_...() is 1),
-    // you will need a zlib/deflate library to decompress it.
-    
-    size_t dataSize = sizeof(my_data_bin_h_567);
-    
-    printf("Original size: %d\n", SIZE_MY_DATA_BIN_H_567());
-    printf("Embedded size: %zu\n", dataSize);
-    printf("Is compressed: %d\n", COMP_MY_DATA_BIN_H_567());
-
-    // You can now use the my_data_bin_h_567 array.
-    
-    return 0;
-}
-```
-
-## Notes
-
-* This tool requires a [recent version](https://github.com/QB64-Phoenix-Edition/QB64pe/releases/latest) of [QB64-PE](https://www.qb64phoenix.com) to build.
-
-## Assets
-
-* [Icon](https://www.iconarchive.com/artist/umut-pulat.html) by [Umut Pulat](http://12m3.deviantart.com/)
+* **Project License**: Licensed under the [MIT License](LICENSE.txt).
+* **Application Icon**: [Icon](https://www.iconarchive.com/artist/umut-pulat.html) by [Umut Pulat](http://12m3.deviantart.com/).

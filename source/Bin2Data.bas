@@ -120,6 +120,7 @@ SUB MakeResource (fileName AS STRING)
                 PRINT "Compressed file size is more than the original size!"
                 EXIT SUB
             ELSE
+                PRINT "Stored (compression did not reduce size)"
                 doStore = _TRUE ' switch to store mode for this file only
             END IF
         END IF
@@ -127,20 +128,22 @@ SUB MakeResource (fileName AS STRING)
 
     PRINT "Writing to "; outputFileName
 
+    DIM isCompressed AS _BYTE: isCompressed = _NEGATE doStore
+
     ' Now we have the output filename and the buffer
     ' Call the appropriate resource generation function
     SELECT CASE appOption.mode
         CASE GENERATE_CONST
-            MakeConst buffer, outputFileName, ogBufSize
+            MakeConst buffer, outputFileName, ogBufSize, isCompressed
 
         CASE GENERATE_CARR
-            MakeCArray buffer, outputFileName, ogBufSize
+            MakeCArray buffer, outputFileName, ogBufSize, isCompressed
 
         CASE GENERATE_RAW
             _WRITEFILE outputFileName, buffer
 
         CASE ELSE ' GENERATE_DATA
-            MakeData buffer, outputFileName, ogBufSize
+            MakeData buffer, outputFileName, ogBufSize, isCompressed
     END SELECT
 END SUB
 
@@ -231,6 +234,11 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
     ' Remove leading and trailing spaces
     DIM text AS STRING: text = _TRIM$(idName)
 
+    IF LEN(text) = 0 THEN
+        MakeQB64LegalId = ID_CONFLICT_RESOLUTION_CHAR
+        EXIT FUNCTION
+    END IF
+
     DIM startingLegal AS _BYTE
 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(text)
@@ -250,14 +258,16 @@ FUNCTION MakeQB64LegalId$ (idName AS STRING)
     NEXT
 
     ' Check if the identifier begins with a single underscore
-    IF ASC(text, 1) = _ASC_UNDERSCORE _ANDALSO LEN(text) > 1 _ANDALSO ASC(text, 2) <> _ASC_UNDERSCORE THEN
+    IF LEN(text) > 0 _ANDALSO ASC(text, 1) = _ASC_UNDERSCORE _ANDALSO LEN(text) > 1 _ANDALSO ASC(text, 2) <> _ASC_UNDERSCORE THEN
         text = "_" + text ' add another underscore to make it legal
     END IF
 
     ' Check if the identifier ends with an underscore
-    WHILE ASC(text, LEN(text)) = _ASC_UNDERSCORE
+    WHILE LEN(text) > 0 _ANDALSO ASC(text, LEN(text)) = _ASC_UNDERSCORE
         text = LEFT$(text, LEN(text) - 1) ' remove trailing underscore
     WEND
+
+    IF LEN(text) = 0 THEN text = ID_CONFLICT_RESOLUTION_CHAR
 
     ' Prefix with 'd' if it is a QB64-PE keyword
     WHILE IsQB64Keyword(text)
@@ -289,7 +299,8 @@ END FUNCTION
 ''' @param buffer The data to be written into the DATA statements.
 ''' @param outputfileName The name of the output file to be created.
 ''' @param ogSize The original size of the data before compression (if applicable).
-SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
+''' @param isCompressed Whether the data in buffer is compressed.
+SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG, isCompressed AS _BYTE)
     CONST DATA_STATEMENT = "DATA "
 
     ' Open the output file
@@ -299,25 +310,25 @@ SUB MakeData (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LO
     PRINT #fh, "$INCLUDEONCE"
     PRINT #fh, _STR_EMPTY
 
-    ' Write the DATA lable
+    ' Write the DATA label
     PRINT #fh, "data_"; MakeIdentifier(outputfileName, ogSize); ":"
 
     PRINT "Encoding data (this may take some time) ... ";
     buffer = _BASE64ENCODE$(buffer) ' we do not need the original buffer contents
     PRINT "done"
 
-    ' Write the DATA header
-    PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(LEN(buffer) <> ogSize))
+    ' Write the DATA header: ogSize, base64DataLen, isCompressed
+    PRINT #fh, DATA_STATEMENT; LTRIM$(STR$(ogSize)); ","; LTRIM$(STR$(LEN(buffer))); ","; LTRIM$(STR$(isCompressed))
 
     DIM srcSizeRem AS _UNSIGNED LONG: srcSizeRem = LEN(buffer) MOD appOption.charPerLine ' remainder
     DIM srcSizeMul AS _UNSIGNED LONG: srcSizeMul = LEN(buffer) - srcSizeRem ' exact multiple
 
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO srcSizeMul STEP appOption.charPerLine
-        PRINT #fh, DATA_STATEMENT; MID$(buffer, i, appOption.charPerLine) ' a worth line of DATA
+        PRINT #fh, DATA_STATEMENT; MID$(buffer, i, appOption.charPerLine) ' a line worth of DATA
     NEXT i
 
     IF srcSizeRem > 0 THEN
-        PRINT #fh, DATA_STATEMENT; MID$(buffer, i, appOption.charPerLine) ' a worth line of DATA
+        PRINT #fh, DATA_STATEMENT; MID$(buffer, i, appOption.charPerLine) ' a line worth of DATA
     END IF
 
     CLOSE fh
@@ -329,7 +340,8 @@ END SUB
 ''' @param buffer The data to be written into the CONST string.
 ''' @param outputfileName The name of the output file to be created.
 ''' @param ogSize The original size of the data before compression (if applicable).
-SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
+''' @param isCompressed Whether the data in buffer is compressed.
+SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG, isCompressed AS _BYTE)
     CONST CONST_KEYWORD = "CONST "
     CONST ASSIGNMENT_STRING = " ="
     CONST LINE_CONTINUATION = " _"
@@ -345,7 +357,7 @@ SUB MakeConst (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED L
     PRINT #fh, _STR_EMPTY
 
     PRINT #fh, CONST_KEYWORD; "SIZE_"; id; ASSIGNMENT_STRING; STR$(ogSize) + "~&" ' write the size const
-    PRINT #fh, CONST_KEYWORD; "COMP_"; id; ASSIGNMENT_STRING; LTRIM$(STR$(LEN(buffer) <> ogSize)); "%%" ' write if file is compressed
+    PRINT #fh, CONST_KEYWORD; "COMP_"; id; ASSIGNMENT_STRING; LTRIM$(STR$(isCompressed)); "%%" ' write if file is compressed
 
     PRINT "Encoding data (this may take some time) ... ";
     buffer = _BASE64ENCODE$(buffer) ' we do not need the original buffer contents
@@ -390,7 +402,8 @@ END SUB
 ''' @param buffer The data to be written into the C array.
 ''' @param outputfileName The name of the output header file to be created.
 ''' @param ogSize The original size of the data before compression (if applicable).
-SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG)
+''' @param isCompressed Whether the data in buffer is compressed.
+SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED LONG, isCompressed AS _BYTE)
     DIM f AS LONG: f = FREEFILE
     OPEN outputfileName FOR OUTPUT AS f
 
@@ -400,31 +413,30 @@ SUB MakeCArray (buffer AS STRING, outputfileName AS STRING, ogSize AS _UNSIGNED 
     PRINT #f, _STR_EMPTY
     PRINT #f, "#include <stdint.h>"
     PRINT #f, _STR_EMPTY
-    PRINT #f, "#define SIZE_"; UCASE$(id); "()"; ogSize
-    PRINT #f, "#define COMP_"; UCASE$(id); "() "; LTRIM$(STR$(LEN(buffer) <> ogSize))
-    PRINT #f, "#define DATA_"; UCASE$(id); "() "; "((uintptr_t)(&"; id; "[0]))"
+    PRINT #f, "#define SIZE_"; UCASE$(id); "() "; ogSize
+    PRINT #f, "#define COMP_"; UCASE$(id); "() "; _IIF(isCompressed, "1", "0")
+    PRINT #f, "#define DATA_"; UCASE$(id); "() ((uintptr_t)(&"; id; "[0]))"
     PRINT #f, _STR_EMPTY
     PRINT #f, "const uint8_t " + id + "[] = {"
 
-    DIM xPos AS _UNSIGNED LONG: xPos = 1
-
+    DIM lineBuf AS STRING
+    DIM char AS STRING
     DIM i AS _UNSIGNED LONG: FOR i = 1 TO LEN(buffer)
-        IF xPos = 1 THEN PRINT #f, SPACE$(INDENT_SPACES);
+        IF LEN(lineBuf) = 0 THEN lineBuf = SPACE$(INDENT_SPACES)
 
-        DIM char AS STRING: char = LTRIM$(STR$(ASC(buffer, i)))
-        PRINT #f, char;
+        char = LTRIM$(STR$(ASC(buffer, i)))
+        IF i < LEN(buffer) THEN char = char + ","
 
-        IF i < LEN(buffer) THEN PRINT #f, ",";
-
-        xPos = xPos + LEN(char) + 1 ' +1 for comma
-
-        IF xPos >= appOption.charPerLine THEN
-            IF i < LEN(buffer) THEN PRINT #f, _STR_EMPTY
-            xPos = 1
+        IF LEN(lineBuf) + LEN(char) >= appOption.charPerLine THEN
+            PRINT #f, lineBuf
+            lineBuf = SPACE$(INDENT_SPACES) + char
+        ELSE
+            lineBuf = lineBuf + char
         END IF
     NEXT i
 
-    PRINT #f, _STR_EMPTY
+    IF LEN(lineBuf) > 0 THEN PRINT #f, lineBuf
+
     PRINT #f, "};"
 
     CLOSE #f
@@ -438,7 +450,7 @@ SetDefaultAppOptions
 CHDIR _STARTDIR$
 
 ' If there are no command line parameters just show some info and exit
-IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
+IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetArgumentIndex("h") > 0 _ORELSE Args_GetArgumentIndex("?") > 0 THEN
     COLOR 7
     PRINT "Bin2Data: Converts binary files to QB64-PE data"
     PRINT "Copyright (c) 2026 Samuel Gomes"
@@ -464,7 +476,7 @@ IF _COMMANDCOUNT < 1 _ORELSE Args_GetArgumentIndex("help") > 0 _ORELSE Args_GetA
     PRINT
     PRINT "Usage:"
     PRINT " 1. Encode the binary file using Bin2Data"
-    PRINT " 2. Include the file or it's contents"
+    PRINT " 2. Include the file or its contents"
     PRINT " 3. Include Resource/Resource.bi at the top of your source (if using the Toolbox64 version)"
     PRINT " 4. Load the file:"
     COLOR 11
@@ -499,14 +511,22 @@ DO
             EXIT DO
 
         CASE "w", "width"
-            argIndex = argIndex + 1 ' value at next index
-            appOption.charPerLine = _CLAMP(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
-            PRINT "Characters per data line set to"; appOption.charPerLine
+            IF argIndex < _COMMANDCOUNT THEN
+                argIndex = argIndex + 1 ' value at next index
+                appOption.charPerLine = _CLAMP(VAL(COMMAND$(argIndex)), BASE64_CHAR_PER_LINE_MIN, BASE64_CHAR_PER_LINE_MAX)
+                PRINT "Characters per data line set to"; appOption.charPerLine
+            ELSE
+                PRINT "Missing value for option: "; argName
+            END IF
 
         CASE "i"
-            argIndex = argIndex + 1 ' value at next index
-            appOption.compLevel = _CLAMP(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
-            PRINT "Compression level set to"; appOption.compLevel
+            IF argIndex < _COMMANDCOUNT THEN
+                argIndex = argIndex + 1 ' value at next index
+                appOption.compLevel = _CLAMP(VAL(COMMAND$(argIndex)), COMP_LEVEL_MIN, COMP_LEVEL_MAX)
+                PRINT "Compression level set to"; appOption.compLevel
+            ELSE
+                PRINT "Missing value for option: "; argName
+            END IF
 
         CASE "d", "data"
             appOption.mode = GENERATE_DATA
@@ -542,8 +562,12 @@ DO
             appOption.overwrite = _TRUE
             PRINT "Overwrite mode enabled"
 
-        CASE ELSE ' probably a file name
-            MakeResource argName
+        CASE ELSE ' probably a file name or unknown option
+            IF (_NEGATE _FILEEXISTS(argName)) _ANDALSO (ASC(argName, 1) = _ASC_MINUS _ORELSE ASC(argName, 1) = _ASC_FORWARDSLASH) THEN
+                PRINT "Unknown option: "; argName
+            ELSE
+                MakeResource argName
+            END IF
     END SELECT
 
     argIndex = argIndex + 1 ' move to the next index

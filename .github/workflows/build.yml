@@ -129,7 +129,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p staging/Bin2Data
-          cp -r screenshots source tests staging/Bin2Data/
+          cp -r docs screenshots source tests staging/Bin2Data/
           cp Bin2Data${{ matrix.exe_ext }} staging/Bin2Data/
           cp Makefile LICENSE.txt README.md staging/Bin2Data/
           rm -f staging/Bin2Data/source/Bin2Data staging/Bin2Data/source/Bin2Data.exe
